@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Feedback Module - AI Load Forecasting</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+        <a class="navbar-brand" href="/feedback/home">
+            <i class="fas fa-bolt me-2"></i>AI Load Forecasting
+        </a>
+        <div class="navbar-nav ms-auto">
+            <a class="nav-link" href="/feedback/submit">
+                <i class="fas fa-comment"></i> Submit Feedback
+            </a>
+            <a class="nav-link" href="/feedback/my-feedback">
+                <i class="fas fa-history"></i> My Feedback
+            </a>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto text-center">
+            <h1 class="display-4 mb-4">
+                <i class="fas fa-comment-dots text-primary me-3"></i>
+                Feedback Management Module
+            </h1>
+            <p class="lead mb-5">
+                Help us improve our AI-based Electricity Load Forecasting System
+            </p>
+
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="card h-100 shadow">
+                        <div class="card-body text-center p-5">
+                            <i class="fas fa-pen-fancy fa-4x text-primary mb-3"></i>
+                            <h3>Submit Feedback</h3>
+                            <p class="text-muted">Share your thoughts, report issues, or suggest improvements</p>
+                            <a href="/feedback/submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-arrow-right me-2"></i>Go to Form
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card h-100 shadow">
+                        <div class="card-body text-center p-5">
+                            <i class="fas fa-history fa-4x text-primary mb-3"></i>
+                            <h3>View History</h3>
+                            <p class="text-muted">Check status and responses to your previous feedback</p>
+                            <a href="/feedback/my-feedback" class="btn btn-primary btn-lg">
+                                <i class="fas fa-arrow-right me-2"></i>View History
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Demo Section -->
+            <div class="card mt-5 bg-light">
+                <div class="card-body">
+                    <h5><i class="fas fa-rocket text-primary me-2"></i>Quick Demo</h5>
+                    <p>Try these test links:</p>
+                    <div class="d-flex justify-content-center gap-3">
+                        <a href="/feedback/my-feedback?email=john@example.com" class="btn btn-outline-primary btn-sm">
+                            View: john@example.com
+                        </a>
+                        <a href="/feedback/my-feedback?email=jane@example.com" class="btn btn-outline-primary btn-sm">
+                            View: jane@example.com
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
