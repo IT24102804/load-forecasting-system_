@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import json
 import joblib
 import numpy as np
 import os
@@ -10,59 +11,62 @@ CORS(app)
 model = None
 scaler = None
 feature_order = None
+model_metadata = {}
+selected_model_name = "unknown"
+
+DEFAULT_FEATURE_ORDER = ["load", "temp", "humidity", "hour", "day", "month", "event", "season"]
+DAY_NAMES = {
+    1: "Monday",
+    2: "Tuesday",
+    3: "Wednesday",
+    4: "Thursday",
+    5: "Friday",
+    6: "Saturday",
+    7: "Sunday",
+    0: "Sunday",
+}
 
 
-
-
-
-
-
-
- # Make sure request and jsonify are imported at the top
-
-@app.route('/anomaly_feedback', methods=['POST'])
+@app.route("/anomaly_feedback", methods=["POST"])
 def anomaly_feedback():
-    data = request.json
-    # You can print it to the console for now just to prove it arrived
+    data = request.json or {}
     print(f"Feedback received for prediction {data.get('prediction_id')}: User Agreed? {data.get('user_agreed')}")
     return jsonify({"status": "success", "message": "Feedback logged in Python!"}), 200
 
 
-
-
-
-
-
-
-
-
-
-
-
+def load_json_file(file_path: str) -> dict:
+    if not os.path.exists(file_path):
+        return {}
+    with open(file_path, "r", encoding="utf-8") as file:
+        return json.load(file)
 
 
 def load_model():
-    global model, scaler, feature_order
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    global model, scaler, feature_order, model_metadata, selected_model_name
 
-    model_path = os.path.join(base_dir, 'model.pkl')
-    scaler_path = os.path.join(base_dir, 'scaler.pkl')
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(base_dir, "model.pkl")
+    scaler_path = os.path.join(base_dir, "scaler.pkl")
+    metadata_path = os.path.join(base_dir, "model_meta.json")
+
+    model_metadata = load_json_file(metadata_path)
+    if model_metadata:
+        print("Loaded model metadata.")
 
     if os.path.exists(model_path):
         model = joblib.load(model_path)
-        print("✅ Model loaded.")
+        print("Model loaded.")
     else:
-        print("❌ Model file not found.")
+        print("Model file not found.")
 
     if os.path.exists(scaler_path):
         scaler = joblib.load(scaler_path)
-        print("✅ Scaler loaded.")
+        print("Scaler loaded.")
     else:
-        print("❌ Scaler file not found.")
+        print("Scaler file not found.")
 
-    # Define feature order (must match training)
-    feature_order = ['load', 'temp', 'humidity', 'hour', 'day', 'month', 'event', 'season']
-    print(f"📋 Expecting features: {feature_order}")
+    feature_order = model_metadata.get("feature_order") or list(getattr(scaler, "feature_names_in_", [])) or DEFAULT_FEATURE_ORDER
+    selected_model_name = model_metadata.get("selected_model") or type(model).__name__
 
 @app.route('/detect_anomaly', methods=['POST'])
 def detect_anomaly():
@@ -96,13 +100,18 @@ def detect_anomaly():
 
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({
-        'status': 'healthy',
-        'model_loaded': model is not None,
-        'scaler_loaded': scaler is not None,
-        'expected_features': feature_order
-    })
+    return jsonify(
+        {
+            "status": "healthy",
+            "model_loaded": model is not None,
+            "scaler_loaded": scaler is not None,
+            "selected_model": selected_model_name,
+            "expected_features": feature_order,
+            "metadata_loaded": bool(model_metadata),
+        }
+    )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     load_model()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5002, debug=True)
