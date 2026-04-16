@@ -100,4 +100,11 @@ public class FeedbackService {
         }
         feedbackRepository.deleteById(id);
     }
+
+    @Transactional
+    public void deleteByPredictionId(Long predictionId) {
+        if (predictionId != null) {
+            feedbackRepository.deleteByPredictionId(predictionId);
+        }
+    }
 }
