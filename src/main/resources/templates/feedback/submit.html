@@ -1,181 +1,151 @@
-
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <title>Submit Feedback - AI Load Forecasting</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link th:href="@{/css/style.css}" rel="stylesheet">
-    <style>
-        .rating {
-            display: flex;
-            flex-direction: row-reverse;
-            justify-content: flex-end;
-        }
-        .rating input {
-            display: none;
-        }
-        .rating label {
-            cursor: pointer;
-            width: 40px;
-            height: 40px;
-            background: #ddd;
-            margin: 0 2px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            transition: 0.3s;
-        }
-        .rating input:checked ~ label,
-        .rating label:hover,
-        .rating label:hover ~ label {
-            background: #ffc107;
-            color: white;
-        }
-        .feedback-form {
-            max-width: 700px;
-            margin: 0 auto;
-        }
-    </style>
-</head>
-<body>
-<!-- Simple Navigation -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-    <div class="container">
-        <a class="navbar-brand" href="/feedback/home">
-            <i class="fas fa-bolt me-2"></i>AI Load Forecasting
-        </a>
-        <div class="navbar-nav ms-auto">
-            <a class="nav-link" href="/feedback/submit">
-                <i class="fas fa-comment"></i> Submit Feedback
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Feedback Portal', 'feedback', ~{::content})}">
+<th:block th:fragment="content">
+
+<div class="container pb-5" style="max-width: 700px;">
+
+    <div class="text-center mb-4">
+        <h2 class="fw-bold"><i class="fas fa-comment-dots me-2" style="color: var(--cobalt);"></i>Submit Feedback</h2>
+        <p style="color: var(--slate);">Help us improve the accuracy of our forecasting models.</p>
+        <div class="d-flex justify-content-center gap-2 mt-3 flex-wrap">
+            <a href="/feedback/home" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+                <i class="fas fa-house me-1"></i>Feedback Home
             </a>
-            <a class="nav-link" href="/feedback/my-feedback">
-                <i class="fas fa-history"></i> My Feedback
+            <a href="/feedback/submit" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold">
+                <i class="fas fa-pen me-1"></i>Submit Feedback
+            </a>
+            <a href="/feedback/my-feedback" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+                <i class="fas fa-history me-1"></i>My Feedback
             </a>
         </div>
     </div>
-</nav>
 
-<div class="container mt-5">
-    <div class="feedback-form">
-        <div class="text-center mb-4">
-            <h1><i class="fas fa-comment-dots text-primary me-2"></i>Submit Feedback</h1>
-            <p class="text-muted">Help us improve our load forecasting system</p>
+    <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show border-0 shadow-sm rounded-3">
+        <i class="fas fa-check-circle me-2 fs-5 align-middle"></i>
+        <span class="align-middle fw-semibold" th:text="${successMessage}">Success message</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show border-0 shadow-sm rounded-3">
+        <i class="fas fa-exclamation-triangle me-2 fs-5 align-middle"></i>
+        <span class="align-middle fw-semibold" th:text="${errorMessage}">Error message</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <div class="ui-card">
+        <div class="card-header-custom px-4 py-3">
+            <h5 class="mb-0 fw-bold"><i class="fas fa-pencil-alt me-2" style="color: var(--cobalt);"></i>Feedback Form</h5>
         </div>
 
-        <!-- Success Message -->
-        <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show">
-            <i class="fas fa-check-circle me-2"></i>
-            <span th:text="${successMessage}">Success message</span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+        <div class="card-body p-4 p-md-5">
+            <form id="submissionForm" th:action="@{/feedback/submit}" th:object="${feedback}" method="post" novalidate>
 
-        <!-- Error Message -->
-        <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show">
-            <i class="fas fa-exclamation-circle me-2"></i>
-            <span th:text="${errorMessage}">Error message</span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-
-        <!-- Feedback Form -->
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="fas fa-pencil-alt me-2"></i>Your Feedback</h5>
-            </div>
-            <div class="card-body">
-                <form th:action="@{/feedback/submit}" th:object="${feedback}" method="post">
-
-                    <!-- Name -->
-                    <div class="mb-3">
-                        <label for="userName" class="form-label">Your Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="userName"
-                               th:field="*{userName}" placeholder="Enter your full name" required>
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <label for="userName" class="form-label">Full Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="userName" th:field="*{userName}" placeholder="e.g. Jane Doe" required>
+                        <div class="invalid-feedback">Please provide your name.</div>
                     </div>
 
-                    <!-- Email -->
-                    <div class="mb-3">
-                        <label for="userEmail" class="form-label">Email Address</label>
+                    <div class="col-md-6 mb-4">
+                        <label for="userEmail" class="form-label">Email Address <span class="text-danger">*</span></label>
+
+
                         <input type="email" class="form-control" id="userEmail"
-                               th:field="*{userEmail}" placeholder="your@email.com (to track your feedback)">
-                        <div class="form-text">We'll use this to show you your feedback history</div>
+                               th:field="*{userEmail}"
+                               placeholder="name@example.com"
+                               required
+                               pattern="[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$">
+                        <div class="invalid-feedback">Please enter a valid email address (e.g. name@example.com).</div>
                     </div>
+                </div>
 
-                    <!-- Feedback Type -->
-                    <div class="mb-3">
-                        <label for="feedbackType" class="form-label">Feedback Type <span class="text-danger">*</span></label>
-                        <select class="form-select" id="feedbackType" th:field="*{feedbackType}" required>
-                            <option value="">-- Select Type --</option>
-                            <option th:each="type : ${feedbackTypes}"
-                                    th:value="${type}"
-                                    th:text="${type.toString().replace('_', ' ')}"></option>
-                        </select>
+                <div class="mb-4">
+                    <label for="feedbackType" class="form-label">Category <span class="text-danger">*</span></label>
+                    <select class="form-select" id="feedbackType" th:field="*{feedbackType}" required>
+                        <option value="">-- Select Classification --</option>
+                        <option th:each="type : ${feedbackTypes}"
+                                th:value="${type}"
+                                th:text="${type.toString().replace('_', ' ')}"></option>
+                    </select>
+                    <div class="invalid-feedback">Please select a feedback category.</div>
+                </div>
+
+                <div class="mb-4 pb-2 border-bottom">
+                    <label class="form-label d-block mb-3">Rate System Accuracy</label>
+                    <div class="rating">
+                        <input type="radio" name="rating" value="5" id="star5" th:field="*{rating}">
+                        <label for="star5"><i class="fas fa-star"></i></label>
+
+                        <input type="radio" name="rating" value="4" id="star4" th:field="*{rating}">
+                        <label for="star4"><i class="fas fa-star"></i></label>
+
+                        <input type="radio" name="rating" value="3" id="star3" th:field="*{rating}">
+                        <label for="star3"><i class="fas fa-star"></i></label>
+
+                        <input type="radio" name="rating" value="2" id="star2" th:field="*{rating}">
+                        <label for="star2"><i class="fas fa-star"></i></label>
+
+                        <input type="radio" name="rating" value="1" id="star1" th:field="*{rating}">
+                        <label for="star1"><i class="fas fa-star"></i></label>
                     </div>
+                </div>
 
-                    <!-- Rating -->
-                    <div class="mb-3">
-                        <label class="form-label d-block">Rate Your Experience</label>
-                        <div class="rating">
-                            <input type="radio" name="rating" value="5" id="star5" th:field="*{rating}">
-                            <label for="star5"><i class="fas fa-star"></i></label>
+                <div class="mb-4">
+                    <label for="message" class="form-label">Detailed Description <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="message" rows="5" th:field="*{message}" required
+                              placeholder="Describe the issue, anomaly, or suggestion in detail..."></textarea>
+                    <div class="invalid-feedback">Please provide a description of your feedback.</div>
+                </div>
 
-                            <input type="radio" name="rating" value="4" id="star4" th:field="*{rating}">
-                            <label for="star4"><i class="fas fa-star"></i></label>
+                <div class="d-flex gap-3 mt-2">
+                    <button type="submit" id="submitFeedbackBtn" class="btn btn-primary-custom flex-grow-1">
+                        <i class="fas fa-paper-plane me-2"></i> Submit Record
+                    </button>
+                    <button type="reset" id="resetFeedbackBtn" class="btn btn-outline-secondary px-4">
+                        <i class="fas fa-undo"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
 
-                            <input type="radio" name="rating" value="3" id="star3" th:field="*{rating}">
-                            <label for="star3"><i class="fas fa-star"></i></label>
-
-                            <input type="radio" name="rating" value="2" id="star2" th:field="*{rating}">
-                            <label for="star2"><i class="fas fa-star"></i></label>
-
-                            <input type="radio" name="rating" value="1" id="star1" th:field="*{rating}">
-                            <label for="star1"><i class="fas fa-star"></i></label>
-                        </div>
-                    </div>
-
-                    <!-- Message -->
-                    <div class="mb-3">
-                        <label for="message" class="form-label">Your Feedback <span class="text-danger">*</span></label>
-                        <textarea class="form-control" id="message" rows="5"
-                                  th:field="*{message}" required
-                                  placeholder="Please share your thoughts, suggestions, or report any issues..."></textarea>
-                    </div>
-
-                    <!-- Submit -->
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary btn-lg">
-                            <i class="fas fa-paper-plane me-2"></i>Submit Feedback
-                        </button>
-                        <button type="reset" class="btn btn-outline-secondary">
-                            <i class="fas fa-undo me-2"></i>Clear Form
-                        </button>
-                    </div>
-                </form>
-//
-
-
-                <script>
-                    function saveEmailToMemory() {
-                        const emailInput = document.getElementById('userEmail').value;
-                        if (emailInput) {
-                            localStorage.setItem('savedFeedbackEmail', emailInput);
-                        }
-                    }
-                </script>
-
-
-
-  //
-            </div>
-            <div class="card-footer text-muted">
-                <small><i class="fas fa-info-circle me-1"></i>Your feedback helps us improve forecast accuracy</small>
-            </div>
+        <div class="card-footer bg-white border-top-0 px-4 pb-4 pt-0 text-center">
+            <small style="color: var(--slate);"><i class="fas fa-shield-alt me-1"></i> Data is processed securely for model optimization.</small>
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-</body>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const form = document.getElementById('submissionForm');
+        const submitBtn = document.getElementById('submitFeedbackBtn');
+        const resetBtn = document.getElementById('resetFeedbackBtn');
+
+        form.addEventListener('submit', function(event) {
+            // 1. Check strict HTML5 Validation
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            } else {
+                // 2. If valid, save the email to local storage BEFORE submitting to backend
+                const emailInput = document.getElementById('userEmail').value;
+                if (emailInput && emailInput.includes('@')) {
+                    localStorage.setItem('savedFeedbackEmail', emailInput);
+                }
+                if (submitBtn) {
+                    submitBtn.dataset.originalHtml = submitBtn.dataset.originalHtml || submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Submitting...';
+                    submitBtn.disabled = true;
+                }
+                if (resetBtn) {
+                    resetBtn.disabled = true;
+                }
+            }
+            // 3. Trigger the red validation UI
+            form.classList.add('was-validated');
+        }, false);
+    });
+</script>
+</th:block>
 </html>
