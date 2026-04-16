@@ -18,4 +18,6 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
 
     // Get all feedback sorted by date (newest first)
     List<Feedback> findAllByOrderByCreatedAtDesc();
+
+    void deleteByPredictionId(Long predictionId);
 }
