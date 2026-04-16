@@ -32,32 +32,52 @@ public class FeedbackController {
         return "feedback/submit";
     }
 
+
+
+
+
+
     @PostMapping("/submit")
     public String submitFeedback(@ModelAttribute Feedback feedback,
                                  RedirectAttributes redirectAttributes) {
+        // Server-side email validation
+        if (feedback.getUserEmail() == null ||
+                !feedback.getUserEmail().matches("^[\\w.%+\\-]+@[\\w.\\-]+\\.[a-zA-Z]{2,}$")) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Please enter a valid email address.");
+            return "redirect:/feedback/submit";
+        }
+
         try {
             feedbackService.saveFeedback(feedback);
             redirectAttributes.addFlashAttribute("successMessage",
-                    "✅ Thank you for your feedback!");
-
+                    "Your feedback has been submitted successfully!");
             if (feedback.getUserEmail() != null && !feedback.getUserEmail().isEmpty()) {
                 return "redirect:/feedback/my-feedback?email=" + feedback.getUserEmail();
             }
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMessage",
-                    "❌ Error: " + e.getMessage());
+                    "Error submitting feedback: " + e.getMessage());
         }
         return "redirect:/feedback/submit";
     }
 
+
+
+
+
+
     @GetMapping("/my-feedback")
     public String viewMyFeedback(@RequestParam(required = false) String email,
                                  Model model) {
+        model.addAttribute("hasFeedback", false);
         if (email != null && !email.isEmpty()) {
             List<Feedback> userFeedback = feedbackService.getFeedbackByEmail(email);
             model.addAttribute("feedbacks", userFeedback);
             model.addAttribute("email", email);
             model.addAttribute("hasFeedback", !userFeedback.isEmpty());
+            model.addAttribute("searchValue", email);
+            model.addAttribute("displayIdentifier", email);
         }
         return "feedback/my-feedback";
     }
