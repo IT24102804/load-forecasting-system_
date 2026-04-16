@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Anomaly Detail', 'anomaly', ~{::content})}">
+<th:block th:fragment="content">
+
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb breadcrumb-custom">
+        <li class="breadcrumb-item"><a th:href="@{/home}"><i class="fas fa-home me-1"></i>Home</a></li>
+        <li class="breadcrumb-item"><a th:href="@{/anomaly}">Anomaly Detection</a></li>
+        <li class="breadcrumb-item"><a th:href="@{/anomaly/list}">All Anomalies</a></li>
+        <li class="breadcrumb-item active" th:text="'Anomaly #' + ${anomaly.id}">Detail</li>
+    </ol>
+</nav>
+
+<div class="row g-4">
+
+    <!-- Left: Main detail card -->
+    <div class="col-lg-8">
+        <div class="ui-card">
+            <div class="card-header-custom d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold">
+                    <i class="fas fa-exclamation-triangle me-2" style="color:var(--cobalt);"></i>
+                    Anomaly Record #<span th:text="${anomaly.id}">0</span>
+                </h5>
+                <div class="d-flex gap-2">
+                    <span class="badge rounded-pill px-3 py-2" th:classappend="${anomaly.severityBadgeClass}"
+                          th:text="${anomaly.severity}">SEVERITY</span>
+                    <span class="badge rounded-pill px-3 py-2" th:classappend="${anomaly.statusBadgeClass}"
+                          th:text="${anomaly.status}">STATUS</span>
+                </div>
+            </div>
+
+            <div class="p-4">
+
+                <!-- Detection reason -->
+                <div class="alert mb-4" style="background:rgba(255,193,7,0.1); border-left:4px solid #FFC107; border-radius:0 8px 8px 0;">
+                    <strong><i class="fas fa-robot me-2"></i>Detection Reason:</strong>
+                    <p class="mb-0 mt-1" th:text="${anomaly.reason}">Reason</p>
+                </div>
+
+                <!-- Sensor readings grid -->
+                <h6 class="fw-bold text-uppercase mb-3" style="color:var(--slate); font-size:0.8rem; letter-spacing:1px;">
+                    Sensor Readings at Detection
+                </h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-sm-4">
+                        <div class="p-3 rounded" style="background:rgba(0,71,171,0.05);">
+                            <div class="small text-muted mb-1">Load Demand</div>
+                            <div class="fw-bold fs-5" th:text="${#numbers.formatDecimal(anomaly.loadDemand, 1, 2) + ' kW'}">-</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="p-3 rounded" style="background:rgba(0,71,171,0.05);">
+                            <div class="small text-muted mb-1">Temperature</div>
+                            <div class="fw-bold fs-5" th:text="${#numbers.formatDecimal(anomaly.temperature, 1, 1) + ' °C'}">-</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="p-3 rounded" style="background:rgba(0,71,171,0.05);">
+                            <div class="small text-muted mb-1">Humidity</div>
+                            <div class="fw-bold fs-5" th:text="${#numbers.formatDecimal(anomaly.humidity, 1, 1) + ' %'}">-</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="p-3 rounded" style="background:rgba(0,71,171,0.05);">
+                            <div class="small text-muted mb-1">Hour of Day</div>
+                            <div class="fw-bold fs-5" th:text="${anomaly.hourOfDay + ':00'}">-</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="p-3 rounded" style="background:rgba(0,71,171,0.05);">
+                            <div class="small text-muted mb-1">Public Event</div>
+                            <div class="fw-bold fs-5" th:text="${anomaly.publicEvent == 1 ? 'Yes' : 'No'}">-</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="p-3 rounded" style="background:rgba(0,71,171,0.05);">
+                            <div class="small text-muted mb-1">Anomaly Score</div>
+                            <div class="fw-bold fs-5" th:text="${#numbers.formatDecimal(anomaly.anomalyScore, 1, 3)}">-</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="p-3 rounded" style="background:rgba(0,71,171,0.05);">
+                            <div class="small text-muted mb-1">Confidence</div>
+                            <div class="fw-bold fs-5"
+                                 th:text="${anomaly.confidence != null ? #numbers.formatDecimal(anomaly.confidence * 100, 1, 1) + ' %' : 'N/A'}">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resolution note (if resolved) -->
+                <div th:if="${anomaly.resolutionNote}" class="admin-reply-box mb-4">
+                    <small class="fw-bold text-uppercase d-block mb-1" style="color:var(--cobalt); font-size:0.75rem;">
+                        <i class="fas fa-check-circle me-1"></i>Resolution Note
+                    </small>
+                    <p class="mb-0" th:text="${anomaly.resolutionNote}">Note</p>
+                    <small class="text-muted" th:if="${anomaly.resolvedAt}"
+                           th:text="'Resolved on: ' + ${#temporals.format(anomaly.resolvedAt, 'MMM dd, yyyy HH:mm')}"></small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Actions card -->
+    <div class="col-lg-4">
+        <div class="ui-card p-4">
+            <h6 class="fw-bold mb-3 text-uppercase" style="color:var(--slate); font-size:0.8rem; letter-spacing:1px;">
+                <i class="fas fa-tools me-2"></i>Actions
+            </h6>
+
+            <!-- Acknowledge button (only if OPEN) -->
+            <form th:if="${anomaly.status == 'OPEN'}" th:action="@{/anomaly/{id}/acknowledge(id=${anomaly.id})}"
+                  method="post" class="mb-3">
+                <button type="submit" id="acknowledgeBtn" class="btn btn-warning w-100 fw-bold"
+                        onclick="return confirm('Mark this anomaly as Acknowledged?')">
+                    <i class="fas fa-eye me-2"></i>Acknowledge
+                </button>
+            </form>
+
+            <!-- Resolve form (only if not yet resolved) -->
+            <div th:if="${anomaly.status != 'RESOLVED'}">
+                <form th:action="@{/anomaly/{id}/resolve(id=${anomaly.id})}"
+                      method="post" id="resolveForm"
+                      onsubmit="return validateResolve()">
+                    <div class="mb-3">
+                        <label class="form-label">Resolution Note <span class="text-danger">*</span></label>
+                        <textarea class="form-control" name="resolutionNote" rows="3" id="resolutionNote"
+                                  placeholder="Describe what caused this anomaly and how it was resolved..."
+                                  required minlength="10"></textarea>
+                        <div class="form-text">Minimum 10 characters required.</div>
+                        <div class="invalid-feedback">Please provide a resolution note (at least 10 characters).</div>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100 fw-bold"
+                            id="resolveBtn">
+                        <i class="fas fa-check-circle me-2"></i>Mark as Resolved
+                    </button>
+                </form>
+            </div>
+
+            <div th:if="${anomaly.status == 'RESOLVED'}" class="text-center py-3">
+                <i class="fas fa-check-circle fa-2x mb-2" style="color:#28a745;"></i>
+                <p class="text-muted small mb-0">This anomaly has been resolved.</p>
+            </div>
+
+            <hr class="my-3 opacity-25">
+
+            <!-- Metadata -->
+            <div class="small text-muted">
+                <div class="mb-1"><i class="fas fa-clock me-2"></i>Detected: <span class="fw-bold" th:text="${anomaly.formattedDate}">-</span></div>
+                <div th:if="${anomaly.predictionId}" class="mb-1">
+                    <i class="fas fa-link me-2"></i>Prediction ID: <span class="fw-bold" th:text="${anomaly.predictionId}">-</span>
+                </div>
+            </div>
+
+            <hr class="my-3 opacity-25">
+            <a th:href="@{/anomaly/list}" class="btn btn-outline-secondary w-100 rounded-pill">
+                <i class="fas fa-arrow-left me-2"></i>Back to List
+            </a>
+        </div>
+    </div>
+
+</div>
+
+</th:block>
+
+<script>
+    function validateResolve() {
+        const note = document.getElementById('resolutionNote');
+        if (!note.value || note.value.trim().length < 10) {
+            note.classList.add('is-invalid');
+            note.focus();
+            return false;
+        }
+        note.classList.remove('is-invalid');
+
+        // Show loading state on button
+        const btn = document.getElementById('resolveBtn');
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Resolving...';
+        btn.disabled = true;
+        return true;
+    }
+
+    const acknowledgeForm = document.getElementById('acknowledgeBtn')?.closest('form');
+    if (acknowledgeForm) {
+        acknowledgeForm.addEventListener('submit', function() {
+            const acknowledgeBtn = document.getElementById('acknowledgeBtn');
+            if (acknowledgeBtn) {
+                acknowledgeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Acknowledging...';
+                acknowledgeBtn.disabled = true;
+            }
+        });
+    }
+</script>
+
+</html>
