@@ -1,0 +1,247 @@
+﻿<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Weather Prediction', 'weather', ~{::content})}">
+<th:block th:fragment="content">
+
+<link rel="stylesheet" th:href="@{/css/weather.css}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb breadcrumb-custom">
+    <li class="breadcrumb-item"><a th:href="@{/home}"><i class="fas fa-home me-1"></i>Home</a></li>
+    <li class="breadcrumb-item active">Weather Prediction</li>
+  </ol>
+</nav>
+
+<div class="weather-shell">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+    <div>
+      <h2 class="fw-bold mb-1"><i class="fas fa-cloud-sun-rain me-2" style="color:var(--cobalt);"></i>Weather Prediction</h2>
+      <p class="text-muted mb-0">Generate weather forecasts and review recent prediction history in one place.</p>
+    </div>
+    <div class="weather-summary-chip">
+      <i class="fas fa-layer-group me-2"></i>5 weather outputs available
+    </div>
+  </div>
+
+  <div class="weather-tab-bar mb-4">
+    <button type="button" class="weather-tab-button active" onclick="showTab('predictor', this)">
+      <i class="fas fa-cloud-sun me-2"></i>Weather Predictor
+    </button>
+    <button type="button" class="weather-tab-button" onclick="showTab('analytics', this)">
+      <i class="fas fa-chart-column me-2"></i>Analytics Dashboard
+    </button>
+  </div>
+
+  <div id="predictor" class="tab-content active">
+    <div class="row g-4">
+      <div class="col-xl-5">
+        <div class="ui-card weather-panel h-100">
+          <div class="card-header-custom px-4 py-3">
+            <h5 class="mb-0 fw-bold"><i class="fas fa-calendar-alt me-2" style="color:var(--cobalt);"></i>Prediction Input</h5>
+          </div>
+          <div class="p-4">
+            <form id="predictionForm" action="/predict" method="post" th:object="${predictionRequest}">
+              <div class="mb-4">
+                <label for="dateTime" class="form-label">Target Timestamp <span class="text-danger">*</span></label>
+                <input id="dateTime" type="datetime-local" class="form-control" th:field="*{dateTime}" required />
+                <div class="form-text"><i class="fas fa-info-circle me-1"></i>Select the date and time to generate a weather forecast.</div>
+              </div>
+              <button type="submit" class="btn-primary-custom w-100 py-2 fw-bold">
+                <i class="fas fa-cloud-sun-rain me-2"></i>Get Weather Prediction
+              </button>
+            </form>
+
+            <div id="messageBox"
+                 class="weather-flash"
+                 th:classappend="${message != null} ? (${success != null and success} ? ' success' : ' error') : ''"
+                 th:style="${message != null} ? 'display:block;' : 'display:none;'">
+              <span id="messageText" th:text="${message}"></span>
+            </div>
+
+            <div class="weather-helper mt-3">
+              <i class="fas fa-circle-info me-2"></i>
+              This module returns temperature, humidity, wind speed, rainfall, and solar irradiance for the selected date and time.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-7">
+        <div class="ui-card weather-panel h-100">
+          <div class="card-header-custom px-4 py-3">
+            <h5 class="mb-0 fw-bold"><i class="fas fa-cloud me-2" style="color:var(--cobalt);"></i>Latest Weather Forecast</h5>
+          </div>
+          <div class="p-4">
+            <div id="resultCard" th:if="${prediction != null}">
+              <div class="weather-forecast-grid">
+                <div class="weather-forecast-item">
+                  <div class="weather-forecast-label">Date</div>
+                  <div class="weather-forecast-value" th:text="${prediction.predictionDate}"></div>
+                </div>
+                <div class="weather-forecast-item">
+                  <div class="weather-forecast-label">Time</div>
+                  <div class="weather-forecast-value" th:text="${prediction.predictionTime}"></div>
+                </div>
+                <div class="weather-forecast-item">
+                  <div class="weather-forecast-label">Temperature</div>
+                  <div class="weather-forecast-value" th:text="${#numbers.formatDecimal(prediction.temperature, 0, 2)} + ' degC'"></div>
+                </div>
+                <div class="weather-forecast-item">
+                  <div class="weather-forecast-label">Humidity</div>
+                  <div class="weather-forecast-value" th:text="${#numbers.formatDecimal(prediction.humidity, 0, 2)} + '%'"></div>
+                </div>
+                <div class="weather-forecast-item">
+                  <div class="weather-forecast-label">Wind Speed</div>
+                  <div class="weather-forecast-value" th:text="${#numbers.formatDecimal(prediction.windSpeed, 0, 2)} + ' m/s'"></div>
+                </div>
+                <div class="weather-forecast-item">
+                  <div class="weather-forecast-label">Rainfall</div>
+                  <div class="weather-forecast-value" th:text="${#numbers.formatDecimal(prediction.rainfall, 0, 2)} + ' mm'"></div>
+                </div>
+                <div class="weather-forecast-item">
+                  <div class="weather-forecast-label">Solar Irradiance</div>
+                  <div class="weather-forecast-value" th:text="${#numbers.formatDecimal(prediction.solarIrradiance, 0, 2)} + ' W/m2'"></div>
+                </div>
+              </div>
+            </div>
+            <div id="resultCard" th:unless="${prediction != null}" class="weather-empty-state">
+              <i class="fas fa-cloud-sun-rain"></i>
+              <p class="mb-1 fw-semibold">No forecast generated yet.</p>
+              <p class="text-muted mb-0">Submit a timestamp to see the weather prediction details here.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ui-card weather-panel mt-4">
+      <div class="card-header-custom px-4 py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0 fw-bold"><i class="fas fa-clock-rotate-left me-2" style="color:var(--cobalt);"></i>Recent Predictions</h5>
+        <span class="small text-muted">Stored weather runs for review and correction</span>
+      </div>
+      <div class="table-responsive">
+        <table id="historyTable" class="table table-hover mb-0 align-middle weather-history-table">
+          <thead class="table-light">
+          <tr>
+            <th>ID</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Temp (degC)</th>
+            <th>Humidity (%)</th>
+            <th>Wind (m/s)</th>
+            <th>Rainfall (mm)</th>
+            <th>Solar (W/m2)</th>
+            <th>Actions</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr th:each="record : ${history}" th:unless="${#lists.isEmpty(history)}">
+            <td th:text="${record.id}">-</td>
+            <td th:text="${record.predictionDate}">-</td>
+            <td th:text="${record.predictionTime}">-</td>
+            <td th:text="${#numbers.formatDecimal(record.temperature, 0, 2)}">-</td>
+            <td th:text="${#numbers.formatDecimal(record.humidity, 0, 2)}">-</td>
+            <td th:text="${#numbers.formatDecimal(record.windSpeed, 0, 2)}">-</td>
+            <td th:text="${#numbers.formatDecimal(record.rainfall, 0, 2)}">-</td>
+            <td th:text="${#numbers.formatDecimal(record.solarIrradiance, 0, 2)}">-</td>
+            <td>
+              <div class="weather-action-buttons">
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill fw-bold" th:data-id="${record.id}" th:data-date="${record.predictionDate}" th:data-time="${record.predictionTime}" onclick="updatePrediction(this)">
+                  <i class="fas fa-edit me-1"></i>Update
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill fw-bold" th:data-id="${record.id}" onclick="deletePrediction(this)">
+                  <i class="fas fa-trash-alt me-1"></i>Delete
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr th:if="${#lists.isEmpty(history)}">
+            <td colspan="9" class="text-center py-4 text-muted">
+              <i class="fas fa-inbox me-2"></i>No predictions yet. Make your first prediction.
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="analytics" class="tab-content">
+    <div class="row g-4 mb-4">
+      <div class="col-6 col-xl-2">
+        <div class="feature-card weather-stat-card h-100">
+          <div class="weather-stat-title">Total Predictions</div>
+          <div id="statTotal" class="weather-stat-number" th:text="${statistics != null && statistics.total != null ? statistics.total : '0'}">0</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-2">
+        <div class="feature-card weather-stat-card h-100">
+          <div class="weather-stat-title">Avg Temperature</div>
+          <div id="statAvgTemperature" class="weather-stat-number" th:text="${statistics != null && statistics.avgTemperature != null ? #numbers.formatDecimal(statistics.avgTemperature, 0, 1) + ' degC' : 'N/A'}">N/A</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-2">
+        <div class="feature-card weather-stat-card h-100">
+          <div class="weather-stat-title">Avg Humidity</div>
+          <div id="statAvgHumidity" class="weather-stat-number" th:text="${statistics != null && statistics.avgHumidity != null ? #numbers.formatDecimal(statistics.avgHumidity, 0, 1) + '%' : 'N/A'}">N/A</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-2">
+        <div class="feature-card weather-stat-card h-100">
+          <div class="weather-stat-title">Max Temperature</div>
+          <div id="statMaxTemperature" class="weather-stat-number" th:text="${statistics != null && statistics.maxTemperature != null ? #numbers.formatDecimal(statistics.maxTemperature, 0, 1) + ' degC' : 'N/A'}">N/A</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-2">
+        <div class="feature-card weather-stat-card h-100">
+          <div class="weather-stat-title">Min Temperature</div>
+          <div id="statMinTemperature" class="weather-stat-number" th:text="${statistics != null && statistics.minTemperature != null ? #numbers.formatDecimal(statistics.minTemperature, 0, 1) + ' degC' : 'N/A'}">N/A</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-2">
+        <div class="feature-card weather-stat-card h-100">
+          <div class="weather-stat-title">Total Rainfall</div>
+          <div id="statTotalRainfall" class="weather-stat-number" th:text="${statistics != null && statistics.totalRainfall != null ? #numbers.formatDecimal(statistics.totalRainfall, 0, 1) + ' mm' : 'N/A'}">N/A</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-8">
+        <div class="ui-card weather-panel h-100">
+          <div class="card-header-custom px-4 py-3">
+            <h5 class="mb-0 fw-bold"><i class="fas fa-chart-line me-2" style="color:var(--cobalt);"></i>Monthly Temperature Trend</h5>
+          </div>
+          <div class="p-4">
+            <div class="weather-chart-container">
+              <canvas id="monthlyTempChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="ui-card weather-panel h-100">
+          <div class="card-header-custom px-4 py-3">
+            <h5 class="mb-0 fw-bold"><i class="fas fa-list-check me-2" style="color:var(--cobalt);"></i>Module Summary</h5>
+          </div>
+          <div class="p-4">
+            <ul class="weather-summary-list mb-0">
+              <li><strong>Default workflow:</strong> select a timestamp and generate the weather forecast.</li>
+              <li><strong>Stored values:</strong> temperature, humidity, wind speed, rainfall, and solar irradiance.</li>
+              <li><strong>History controls:</strong> update or delete previous predictions directly from the table.</li>
+              <li><strong>Analytics:</strong> review monthly temperature patterns and headline weather statistics.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script th:inline="javascript">
+  var monthlyData = /*[[${statistics != null ? statistics.monthlyTemps : null}]]*/ [];
+</script>
+<script th:src="@{/js/weather.js}"></script>
+</th:block>
+</html>
