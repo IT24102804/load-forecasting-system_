@@ -42,6 +42,8 @@ public class LoadController {
 
             // 2. Call anomaly detection service
             Map<String, Object> anomalyResult = anomalyService.detectAnomaly(
+                    request.getId(),
+                    request.getTimestamp(),
                     prediction,
                     request.getTemperature(),
                     request.getHumidity(),
@@ -70,6 +72,11 @@ public class LoadController {
             response.put("load_demand", prediction);
             response.put("is_anomaly", anomalyResult.get("is_anomaly"));
             response.put("anomaly_score", request.getAnomalyScore());
+            response.put("confidence", anomalyResult.getOrDefault("confidence", 0.0));
+            response.put("severity", anomalyResult.getOrDefault("severity", "NORMAL"));
+            response.put("reason", anomalyResult.getOrDefault("reason", ""));
+            response.put("source", anomalyResult.getOrDefault("source", "python_model"));
+            response.put("model_name", anomalyResult.getOrDefault("model_name", "local_outlier_factor"));
 
             return ResponseEntity.ok(response);
 
@@ -82,6 +89,12 @@ public class LoadController {
     @PostMapping("/feedback")
     public ResponseEntity<?> storeFeedback(@RequestBody Map<String, Object> feedbackData) {
         try {
+
+            // Validate payload before casting to avoid NullPointerException
+            if (!feedbackData.containsKey("prediction_id") || !feedbackData.containsKey("user_agreed")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Missing prediction_id or user_agreed"));
+            }
+
             // 1. Extract basic data
             Long predictionId = ((Number) feedbackData.get("prediction_id")).longValue();
             Boolean agreed = (Boolean) feedbackData.get("user_agreed");
