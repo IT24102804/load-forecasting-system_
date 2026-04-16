@@ -4,6 +4,7 @@ import json
 import joblib
 import numpy as np
 import os
+import pandas as pd
 
 app = Flask(__name__)
 CORS(app)
@@ -68,37 +69,98 @@ def load_model():
     feature_order = model_metadata.get("feature_order") or list(getattr(scaler, "feature_names_in_", [])) or DEFAULT_FEATURE_ORDER
     selected_model_name = model_metadata.get("selected_model") or type(model).__name__
 
-@app.route('/detect_anomaly', methods=['POST'])
+    print(f"Selected model: {selected_model_name}")
+    print(f"Expecting features: {feature_order}")
+
+
+def build_feature_frame(payload: dict) -> pd.DataFrame:
+    row = {}
+    for feature in feature_order:
+        value = payload.get(feature, 0)
+        if feature in {"hour", "day", "month", "event", "season"}:
+            row[feature] = int(value)
+        else:
+            row[feature] = float(value)
+    return pd.DataFrame([row], columns=feature_order)
+
+
+def calculate_confidence(anomaly_score: float, decision_score: float | None) -> float:
+    base_score = abs(decision_score) if decision_score is not None else abs(anomaly_score)
+    confidence = 1.0 / (1.0 + np.exp(-base_score))
+    return float(np.clip(confidence, 0.5, 0.999))
+
+
+def classify_severity(anomaly_margin: float) -> str:
+    if anomaly_margin >= 1.5:
+        return "HIGH"
+    if anomaly_margin >= 0.5:
+        return "MEDIUM"
+    return "LOW"
+
+
+def build_reason(data: dict, severity: str, is_anomaly: bool) -> str:
+    if not is_anomaly:
+        return "Load behavior matches historical patterns."
+
+    try:
+        day_num = int(data.get("day", 1))
+    except (ValueError, TypeError):
+        day_num = 1
+
+    current_day = DAY_NAMES.get(day_num, "this day")
+    load_value = float(data.get("load", 0.0))
+    temp_value = float(data.get("temp", 0.0))
+    hour_value = int(data.get("hour", 0))
+
+    if severity == "HIGH":
+        return (
+            f"Predicted load of {load_value:.1f} kW is strongly abnormal for "
+            f"{temp_value:.1f}°C at hour {hour_value}."
+        )
+    if severity == "MEDIUM":
+        return f"Unusual load pattern detected compared to normal {current_day} behavior."
+    return "Slight deviation from expected load demand."
+
+
+@app.route("/detect_anomaly", methods=["POST"])
 def detect_anomaly():
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         if model is None or scaler is None:
-            return jsonify({'is_anomaly': False, 'error': 'Model not loaded'}), 503
+            return jsonify({"is_anomaly": False, "error": "Model not loaded"}), 503
 
-        # Build feature array in the exact order
-        features = []
-        for feat in feature_order:
-            val = data.get(feat, 0)
-            features.append(val)
+        feature_frame = build_feature_frame(data)
+        features_scaled = scaler.transform(feature_frame)
 
-        # Convert to numpy and scale
-        features_array = np.array(features).reshape(1, -1)
-        features_scaled = scaler.transform(features_array)
+        pred = model.predict(features_scaled)[0]
+        raw_score = float(model.score_samples(features_scaled)[0])
+        anomaly_score = float(-raw_score)
 
-        # Predict
-        pred = model.predict(features_scaled)[0]   # 1 = normal, -1 = anomaly
-        score = model.score_samples(features_scaled)[0]
+        decision_score = None
+        if hasattr(model, "decision_function"):
+            decision_score = float(model.decision_function(features_scaled)[0])
 
-        return jsonify({
-            'is_anomaly': bool(pred == -1),
-            'anomaly_score': float(score),
-            'confidence': float(abs(score)) if pred == -1 else float(1 - abs(score))
-        })
+        is_anomaly = bool(pred == -1)
+        anomaly_margin = max(0.0, -decision_score) if decision_score is not None else anomaly_score
+        severity = classify_severity(anomaly_margin) if is_anomaly else "NORMAL"
+        confidence = calculate_confidence(anomaly_score, decision_score)
+        reason = build_reason(data, severity, is_anomaly)
 
-    except Exception as e:
-        return jsonify({'is_anomaly': False, 'error': str(e)}), 500
+        return jsonify(
+            {
+                "is_anomaly": is_anomaly,
+                "anomaly_score": anomaly_score,
+                "confidence": confidence,
+                "severity": severity,
+                "reason": reason,
+                "model_name": selected_model_name,
+            }
+        )
+    except Exception as error:
+        return jsonify({"is_anomaly": False, "error": str(error)}), 500
 
-@app.route('/health', methods=['GET'])
+
+@app.route("/health", methods=["GET"])
 def health():
     return jsonify(
         {
