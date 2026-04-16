@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Anomaly Dashboard', 'anomaly', ~{::content})}">
+<th:block th:fragment="content">
+
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb breadcrumb-custom">
+        <li class="breadcrumb-item"><a th:href="@{/home}"><i class="fas fa-home me-1"></i>Home</a></li>
+        <li class="breadcrumb-item active">Anomaly Detection</li>
+    </ol>
+</nav>
+
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1"><i class="fas fa-exclamation-triangle me-2" style="color: var(--cobalt);"></i>Anomaly Detection Dashboard</h2>
+        <p class="text-muted mb-0">Real-time monitoring of load demand anomalies</p>
+    </div>
+    <a th:href="@{/anomaly/list}" class="btn-primary-custom">
+        <i class="fas fa-list me-2"></i>View All Anomalies
+    </a>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3 col-6">
+        <div class="card metric-card bg-cobalt-grad">
+            <div class="card-body">
+                <h6 class="text-uppercase fw-bold opacity-75 mb-1" style="font-size:0.75rem; letter-spacing:1px;">Total Detected</h6>
+                <h2 class="display-5 fw-bold mb-0" th:text="${totalAnomalies}">0</h2>
+                <i class="fas fa-database icon-bg"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card metric-card bg-danger-grad">
+            <div class="card-body">
+                <h6 class="text-uppercase fw-bold opacity-75 mb-1" style="font-size:0.75rem; letter-spacing:1px;">High Severity</h6>
+                <h2 class="display-5 fw-bold mb-0" th:text="${highCount}">0</h2>
+                <i class="fas fa-exclamation-circle icon-bg"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card metric-card bg-warning-grad">
+            <div class="card-body">
+                <h6 class="text-uppercase fw-bold opacity-75 mb-1" style="font-size:0.75rem; letter-spacing:1px;">Open / Unresolved</h6>
+                <h2 class="display-5 fw-bold mb-0" th:text="${openCount}">0</h2>
+                <i class="fas fa-clock icon-bg" style="color:#333;"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card metric-card bg-success-grad">
+            <div class="card-body">
+                <h6 class="text-uppercase fw-bold opacity-75 mb-1" style="font-size:0.75rem; letter-spacing:1px;">Today</h6>
+                <h2 class="display-5 fw-bold mb-0" th:text="${todayCount}">0</h2>
+                <i class="fas fa-calendar-day icon-bg"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Anomalies Table -->
+<div class="ui-card">
+    <div class="card-header-custom d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold"><i class="fas fa-bell me-2" style="color:var(--cobalt);"></i>Recent Anomalies</h5>
+        <a th:href="@{/anomaly/list}" class="btn btn-sm btn-outline-secondary rounded-pill">View All</a>
+    </div>
+
+    <div th:if="${recentAnomalies != null and !recentAnomalies.isEmpty()}">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Detected At</th>
+                        <th>Load (kW)</th>
+                        <th>Temp (&deg;C)</th>
+                        <th>Confidence</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                        <th>Reason</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="a : ${recentAnomalies}"
+                        th:classappend="${'anomaly-row-' + a.severity.toLowerCase()}">
+                        <td class="fw-bold text-muted small" th:text="${a.id}">1</td>
+                        <td class="small" th:text="${a.formattedDate}">date</td>
+                        <td class="fw-bold" th:text="${#numbers.formatDecimal(a.loadDemand, 1, 2)}">0.00</td>
+                        <td th:text="${#numbers.formatDecimal(a.temperature, 1, 1)}">0.0</td>
+                        <td th:text="${a.confidence != null ? #numbers.formatDecimal(a.confidence * 100, 1, 1) + '%' : 'N/A'}">0.0%</td>
+                        <td>
+                            <span class="badge rounded-pill px-3" th:classappend="${a.severityBadgeClass}" th:text="${a.severity}">HIGH</span>
+                        </td>
+                        <td>
+                            <span class="badge rounded-pill px-2" th:classappend="${a.statusBadgeClass}" th:text="${a.status}">OPEN</span>
+                        </td>
+                        <td class="small text-muted" style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                            th:text="${a.reason}">reason</td>
+                        <td>
+                            <a th:href="@{/anomaly/{id}(id=${a.id})}" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                                <i class="fas fa-eye me-1"></i>Details
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div th:if="${recentAnomalies == null or recentAnomalies.isEmpty()}" class="empty-state p-5">
+        <i class="fas fa-check-circle" style="font-size:3rem; color:#28a745; display:block; margin-bottom:1rem;"></i>
+        <h5 class="fw-bold">No anomalies detected</h5>
+        <p class="text-muted">Load demand patterns are within expected ranges. Run a forecast to start detection.</p>
+        <a th:href="@{/home}" class="btn-primary-custom mt-2">
+            <i class="fas fa-bolt me-2"></i>Go to Forecast Engine
+        </a>
+    </div>
+</div>
+
+<!-- Severity distribution info -->
+<div class="row g-3 mt-3">
+    <div class="col-md-4">
+        <div class="ui-card p-3 d-flex align-items-center gap-3">
+            <div class="status-dot high" style="width:14px; height:14px;"></div>
+            <div>
+                <div class="fw-bold">High Severity</div>
+                <small class="text-muted">Strong anomaly signal detected. Review immediately.</small>
+            </div>
+            <span class="badge bg-danger ms-auto" th:text="${highCount}">0</span>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="ui-card p-3 d-flex align-items-center gap-3">
+            <div class="status-dot medium" style="width:14px; height:14px;"></div>
+            <div>
+                <div class="fw-bold">Medium Severity</div>
+                <small class="text-muted">Significant deviation detected. Investigation recommended.</small>
+            </div>
+            <span class="badge bg-warning text-dark ms-auto" th:text="${mediumCount}">0</span>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="ui-card p-3 d-flex align-items-center gap-3">
+            <div class="status-dot low" style="width:14px; height:14px;"></div>
+            <div>
+                <div class="fw-bold">Low Severity</div>
+                <small class="text-muted">Mild deviation detected. Monitor or verify.</small>
+            </div>
+            <span class="badge bg-success ms-auto" th:text="${lowCount}">0</span>
+        </div>
+    </div>
+</div>
+
+</th:block>
+</html>
