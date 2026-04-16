@@ -1,5 +1,6 @@
 package com.example.loadforcasting.Entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -11,8 +12,10 @@ public class LoadRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Column(name = "timestamp", nullable = false)
     private LocalDateTime timestamp;
+
 
     @Column(name = "temperature", nullable = false)
     private double temperature;
