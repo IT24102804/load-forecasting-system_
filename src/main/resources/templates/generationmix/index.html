@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Generation Mix', 'generationmix', ~{::content})}">
+<th:block th:fragment="content">
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb breadcrumb-custom">
+        <li class="breadcrumb-item"><a th:href="@{/home}"><i class="fas fa-home me-1"></i>Home</a></li>
+        <li class="breadcrumb-item active">Generation Mix</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <h2 class="fw-bold mb-1">
+            <i class="fas fa-industry me-2" style="color:var(--cobalt);"></i>Generation Mix Prediction
+        </h2>
+        <p class="text-muted mb-0">Use a saved forecast to estimate the daily generation mix for the selected date.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a th:href="@{/home}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+            <i class="fas fa-bolt me-1"></i>Quick Prediction
+        </a>
+        <a th:href="@{/forecast/dashboard}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold">
+            <i class="fas fa-chart-line me-1"></i>Forecast Dashboard
+        </a>
+    </div>
+</div>
+
+<div id="mixAlert" class="alert alert-dismissible fade show border-0 shadow-sm mb-4" style="display:none;" role="alert">
+    <i id="mixAlertIcon" class="me-2"></i>
+    <span id="mixAlertText"></span>
+    <button type="button" class="btn-close" onclick="hideMixAlert()"></button>
+</div>
+
+<div th:if="${pageError}" class="alert alert-warning border-0 shadow-sm mb-4">
+    <i class="fas fa-exclamation-circle me-2"></i>
+    <span th:text="${pageError}"></span>
+</div>
+
+<div th:if="${selectedPrediction == null}" class="ui-card p-4 p-lg-5 text-center">
+    <div class="mx-auto" style="max-width:620px;">
+        <div class="rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+             style="width:72px;height:72px;background:rgba(0,71,171,0.08);color:var(--cobalt);">
+            <i class="fas fa-link fa-2x"></i>
+        </div>
+        <h4 class="fw-bold mb-3">Forecast Required</h4>
+        <p class="text-muted mb-4" th:text="${pageInstruction}">
+            Generate a forecast first, then open Generation Mix from that prediction result.
+        </p>
+        <div class="d-flex justify-content-center gap-2 flex-wrap">
+            <a th:href="@{/home}" class="btn-primary-custom">
+                <i class="fas fa-bolt me-2"></i>Generate Forecast
+            </a>
+            <a th:href="@{/forecast/dashboard}" class="btn btn-outline-primary rounded-pill px-4 fw-bold">
+                <i class="fas fa-history me-1"></i>Open Forecast Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<div th:if="${selectedPrediction != null}" class="row g-4">
+    <div class="col-lg-4">
+        <div class="ui-card h-100">
+            <div class="card-header-custom px-4 py-3">
+                <h5 class="mb-0 fw-bold">
+                    <i class="fas fa-sliders-h me-2" style="color:var(--cobalt);"></i>Generation Mix Inputs
+                </h5>
+            </div>
+            <div class="p-4">
+                <div class="alert alert-info border-0 small">
+                    <i class="fas fa-info-circle me-2"></i>
+                    The saved forecast load is reused automatically. Only the reservoir level is entered here.
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-6">
+                        <div class="p-3 rounded" style="background:rgba(0,71,171,0.05);">
+                            <div class="small text-muted mb-1">Prediction ID</div>
+                            <div class="fw-bold" th:text="${selectedPrediction.id}">--</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 rounded" style="background:rgba(0,71,171,0.05);">
+                            <div class="small text-muted mb-1">Forecast Load</div>
+                            <div class="fw-bold">
+                                <span th:text="${#numbers.formatDecimal(selectedPrediction.predictedLoad, 1, 2)}">--</span> kW
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="p-3 rounded" style="background:rgba(40,167,69,0.08);">
+                            <div class="small text-muted mb-1">Estimated Daily Demand</div>
+                            <div class="fw-bold">
+                                <span th:text="${#numbers.formatDecimal(estimatedDailyDemand, 1, 2)}">--</span> MWh
+                            </div>
+                            <div class="small text-muted mt-1">Derived automatically from the saved forecast for the selected date.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="mixDate" class="form-label">Forecast Date</label>
+                    <input id="mixDate" type="text" class="form-control"
+                           th:value="${#temporals.format(selectedPrediction.timestamp, 'yyyy-MM-dd')}" readonly>
+                </div>
+
+                <div class="mb-4">
+                    <label for="reservoirPct" class="form-label">Reservoir Level (%) <span class="text-danger">*</span></label>
+                    <input id="reservoirPct" type="number" class="form-control" min="0" max="100" step="0.1"
+                           value="75" placeholder="e.g. 75">
+                    <div class="form-text">Enter a value between 0 and 100.</div>
+                </div>
+
+                <button id="generateMixBtn" type="button" class="btn-primary-custom w-100 py-2">
+                    <i class="fas fa-project-diagram me-2"></i>Generate Mix
+                </button>
+
+                <div id="mixLoading" class="loading mt-4">
+                    <div class="spinner-border spinner-border-sm" style="color:var(--cobalt);" role="status"></div>
+                    <span class="ms-2 fw-semibold text-muted">Calculating generation mix...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div id="mixEmpty" class="ui-card p-4 p-lg-5 text-center h-100">
+            <div class="empty-state py-5">
+                <i class="fas fa-chart-pie"></i>
+                <p class="text-muted mb-1">Generate the mix to see the source breakdown.</p>
+                <p class="small text-muted mb-0">The result will show total MWh, source contributions, and estimated renewable inputs.</p>
+            </div>
+        </div>
+
+        <div id="mixResultSection" style="display:none;">
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="metric-card bg-cobalt-grad h-100">
+                        <div class="card-body text-center">
+                            <div class="small text-uppercase opacity-75 mb-2">Total Generation</div>
+                            <div id="mixTotalMwh" class="display-6 fw-bold">--</div>
+                            <div class="small opacity-75">MWh</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="metric-card bg-success-grad h-100">
+                        <div class="card-body text-center">
+                            <div class="small text-uppercase opacity-75 mb-2">Major Hydro</div>
+                            <div id="mixHydroMwh" class="display-6 fw-bold">--</div>
+                            <div id="mixHydroPct" class="small opacity-75">--</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="metric-card bg-warning-grad h-100">
+                        <div class="card-body text-center">
+                            <div class="small text-uppercase opacity-75 mb-2">Coal</div>
+                            <div id="mixCoalMwh" class="display-6 fw-bold">--</div>
+                            <div id="mixCoalPct" class="small opacity-75">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ui-card mb-4">
+                <div class="card-header-custom px-4 py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-layer-group me-2" style="color:var(--cobalt);"></i>Operational Summary
+                    </h5>
+                </div>
+                <div class="p-4">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="p-3 rounded" style="background:rgba(0,71,171,0.05);">
+                                <div class="small text-muted mb-1">Forecast Load Used</div>
+                                <div class="fw-bold"><span id="mixForecastLoad">--</span> kW</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 rounded" style="background:rgba(0,71,171,0.05);">
+                                <div class="small text-muted mb-1">Daily Demand Estimate</div>
+                                <div class="fw-bold"><span id="mixEstimatedDemand">--</span> MWh</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 rounded" style="background:rgba(0,71,171,0.05);">
+                                <div class="small text-muted mb-1">Reservoir Input</div>
+                                <div class="fw-bold"><span id="mixReservoir">--</span>%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-4">
+                            <div class="p-3 rounded" style="background:rgba(255,193,7,0.12);">
+                                <div class="small text-muted mb-1">Estimated Wind</div>
+                                <div class="fw-bold"><span id="mixWindInput">--</span> MWh</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 rounded" style="background:rgba(255,193,7,0.12);">
+                                <div class="small text-muted mb-1">Estimated Solar</div>
+                                <div class="fw-bold"><span id="mixSolarInput">--</span> MWh</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 rounded" style="background:rgba(255,193,7,0.12);">
+                                <div class="small text-muted mb-1">Estimated Mini Hydro</div>
+                                <div class="fw-bold"><span id="mixMiniHydroInput">--</span> MWh</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ui-card mb-4">
+                <div class="card-header-custom px-4 py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-chart-pie me-2" style="color:var(--cobalt);"></i>Generation Mix Distribution
+                    </h5>
+                </div>
+                <div class="p-4">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <canvas id="mixPieChart" height="260"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <canvas id="mixBarChart" height="260"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ui-card">
+                <div class="card-header-custom px-4 py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-table me-2" style="color:var(--cobalt);"></i>Source Breakdown
+                    </h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                        <tr>
+                            <th>Source</th>
+                            <th>Generation (MWh)</th>
+                            <th>Contribution (%)</th>
+                            <th>Type</th>
+                        </tr>
+                        </thead>
+                        <tbody id="mixResultTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script th:inline="javascript">
+    const selectedPredictionId = /*[[${selectedPrediction != null ? selectedPrediction.id : null}]]*/ null;
+    let mixPieChart = null;
+    let mixBarChart = null;
+
+    function showMixAlert(type, message) {
+        const box = document.getElementById('mixAlert');
+        const icon = document.getElementById('mixAlertIcon');
+        document.getElementById('mixAlertText').textContent = message;
+        box.className = 'alert alert-' + (type === 'success' ? 'success' : 'danger') +
+            ' alert-dismissible fade show border-0 shadow-sm mb-4';
+        icon.className = 'fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-circle') + ' me-2';
+        box.style.display = 'block';
+    }
+
+    function hideMixAlert() {
+        document.getElementById('mixAlert').style.display = 'none';
+    }
+
+    function setMixButtonBusy(button, isBusy, busyHtml) {
+        if (!button) {
+            return;
+        }
+        if (!button.dataset.originalHtml) {
+            button.dataset.originalHtml = button.innerHTML;
+        }
+        button.disabled = isBusy;
+        button.innerHTML = isBusy ? busyHtml : button.dataset.originalHtml;
+    }
+
+    function formatNumber(value) {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }) : '--';
+    }
+
+    function buildSources(result) {
+        return [
+            { name: 'Major Hydro', key: 'major_hydro', type: 'Renewable' },
+            { name: 'Coal', key: 'total_coal', type: 'Non-Renewable' },
+            { name: 'Thermal', key: 'total_thermal', type: 'Non-Renewable' },
+            { name: 'Wind', key: 'wind', type: 'Renewable' },
+            { name: 'Solar', key: 'solar', type: 'Renewable' },
+            { name: 'Mini Hydro', key: 'mini_hydro', type: 'Renewable' }
+        ].map(source => ({
+            ...source,
+            mwh: Number(result.prediction?.[source.key] ?? 0),
+            pct: Number(result.percentages?.[source.key] ?? 0)
+        }));
+    }
+
+    function renderMixCharts(sources) {
+        const labels = sources.map(source => source.name);
+        const values = sources.map(source => source.mwh);
+        const percentages = sources.map(source => source.pct);
+        const colors = ['#0d6efd', '#ffc107', '#dc3545', '#20c997', '#fd7e14', '#6610f2'];
+
+        if (mixPieChart) {
+            mixPieChart.destroy();
+        }
+        if (mixBarChart) {
+            mixBarChart.destroy();
+        }
+
+        mixPieChart = new Chart(document.getElementById('mixPieChart').getContext('2d'), {
+            type: 'pie',
+            data: {
+                labels,
+                datasets: [{ data: percentages, backgroundColor: colors }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+
+        mixBarChart = new Chart(document.getElementById('mixBarChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Generation (MWh)',
+                    data: values,
+                    backgroundColor: colors
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+
+    function renderMixResult(result) {
+        document.getElementById('mixEmpty').style.display = 'none';
+        document.getElementById('mixResultSection').style.display = 'block';
+
+        document.getElementById('mixTotalMwh').textContent = formatNumber(result.total_mwh);
+        document.getElementById('mixHydroMwh').textContent = formatNumber(result.prediction?.major_hydro);
+        document.getElementById('mixHydroPct').textContent = `${result.percentages?.major_hydro ?? '--'}%`;
+        document.getElementById('mixCoalMwh').textContent = formatNumber(result.prediction?.total_coal);
+        document.getElementById('mixCoalPct').textContent = `${result.percentages?.total_coal ?? '--'}%`;
+
+        document.getElementById('mixForecastLoad').textContent = formatNumber(result.forecast_load);
+        document.getElementById('mixEstimatedDemand').textContent = formatNumber(result.estimated_load_demand);
+        document.getElementById('mixReservoir').textContent = formatNumber(result.reservoir_pct);
+        document.getElementById('mixWindInput').textContent = formatNumber(result.inputs_used?.wind_lag1);
+        document.getElementById('mixSolarInput').textContent = formatNumber(result.inputs_used?.solar_lag1);
+        document.getElementById('mixMiniHydroInput').textContent = formatNumber(result.inputs_used?.mini_hydro_lag1);
+
+        const sources = buildSources(result);
+        document.getElementById('mixResultTable').innerHTML = sources.map(source => `
+            <tr>
+                <td class="fw-semibold">${source.name}</td>
+                <td>${formatNumber(source.mwh)}</td>
+                <td>${source.pct.toFixed(1)}%</td>
+                <td>
+                    <span class="badge ${source.type === 'Renewable' ? 'bg-success' : 'bg-danger'}">
+                        ${source.type}
+                    </span>
+                </td>
+            </tr>
+        `).join('');
+
+        renderMixCharts(sources);
+    }
+
+    async function generateMix() {
+        hideMixAlert();
+
+        if (!selectedPredictionId) {
+            showMixAlert('error', 'Generate or select a forecast first.');
+            return;
+        }
+
+        const reservoirInput = document.getElementById('reservoirPct');
+        const reservoirPct = Number.parseFloat(reservoirInput.value);
+        if (!Number.isFinite(reservoirPct) || reservoirPct < 0 || reservoirPct > 100) {
+            showMixAlert('error', 'Reservoir percentage must be between 0 and 100.');
+            reservoirInput.focus();
+            return;
+        }
+
+        const button = document.getElementById('generateMixBtn');
+        document.getElementById('mixLoading').style.display = 'block';
+        setMixButtonBusy(button, true, '<span class="spinner-border spinner-border-sm me-2"></span>Generating...');
+
+        try {
+            const response = await fetch('/api/generation-mix/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    predictionId: selectedPredictionId,
+                    reservoirPct: reservoirPct
+                })
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.error || 'Generation mix request failed.');
+            }
+
+            renderMixResult(result);
+            showMixAlert('success', 'Generation mix generated successfully.');
+        } catch (error) {
+            showMixAlert('error', error.message || 'Generation mix request failed.');
+        } finally {
+            document.getElementById('mixLoading').style.display = 'none';
+            setMixButtonBusy(button, false);
+        }
+    }
+
+    const generateMixBtn = document.getElementById('generateMixBtn');
+    if (generateMixBtn) {
+        generateMixBtn.addEventListener('click', generateMix);
+    }
+</script>
+
+</th:block>
+</html>
