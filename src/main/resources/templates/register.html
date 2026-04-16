@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register - AI Load Forecasting</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" th:href="@{/css/main.css}">
+</head>
+<body style="background-color:#F4F7F9; display:flex; align-items:center;
+             justify-content:center; min-height:100vh;">
+<div style="width:100%; max-width:420px; padding:1rem;">
+  <div class="text-center mb-4">
+    <div class="mb-3 d-inline-block p-3 rounded-circle" style="background: rgba(0, 71, 171, 0.05);">
+      <i class="fas fa-user-plus fa-2x" style="color: var(--cobalt);"></i>
+    </div>
+    <h3 class="fw-bold" style="color: var(--navy);">Create Account</h3>
+    <p class="text-muted small">Join the load forecasting network</p>
+  </div>
+
+  <form th:action="@{/register}" method="post" id="registerForm" novalidate>
+    <div th:if="${error}" class="alert alert-danger py-2 small border-0 mb-3 text-center">
+      <i class="fas fa-exclamation-circle me-2"></i>
+      <span th:text="${error}"></span>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-bold" style="color: var(--navy);">Full Name</label>
+      <div class="input-group">
+        <span class="input-group-text bg-light border-end-0"><i class="fas fa-user text-muted"></i></span>
+        <input type="text" name="name" class="form-control border-start-0" placeholder="John Doe" required>
+        <div class="invalid-feedback">Please enter your name.</div>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-bold" style="color: var(--navy);">Email Address</label>
+      <div class="input-group">
+        <span class="input-group-text bg-light border-end-0"><i class="fas fa-envelope text-muted"></i></span>
+        <input type="email" name="email" class="form-control border-start-0" placeholder="name@example.com" required>
+        <div class="invalid-feedback">A valid email is required.</div>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label class="form-label small fw-bold" style="color: var(--navy);">Password</label>
+      <div class="input-group">
+          <span class="input-group-text bg-light border-end-0">
+              <i class="fas fa-lock text-muted"></i>
+          </span>
+        <input type="password" name="password" id="regPasswordInput"
+               class="form-control border-start-0 border-end-0"
+               placeholder="Create a password" required minlength="6" autocomplete="new-password">
+        <span class="input-group-text bg-light border-start-0"
+              onclick="toggleRegPassword()" style="cursor:pointer;">
+              <i class="fas fa-eye text-muted" id="regEyeIcon"></i>
+          </span>
+        <div class="invalid-feedback">Password must be at least 6 characters.</div>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary-custom w-100 rounded-pill mb-3">
+      Create Account <i class="fas fa-check ms-2"></i>
+    </button>
+  </form>
+
+  <div class="text-center">
+    <p class="small text-muted">Already have an account?
+      <a th:href="@{/}" class="fw-bold" style="color: var(--cobalt); text-decoration: none;">Log in</a>
+    </p>
+  </div>
+</div>
+
+<script>
+  function toggleRegPassword() {
+    const input = document.getElementById('regPasswordInput');
+    const icon = document.getElementById('regEyeIcon');
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.classList.remove('fa-eye');
+      icon.classList.add('fa-eye-slash');
+    } else {
+      input.type = 'password';
+      icon.classList.remove('fa-eye-slash');
+      icon.classList.add('fa-eye');
+    }
+  }
+
+  // Client-side visual validation
+  document.getElementById('registerForm').addEventListener('submit', function(event) {
+    if (!this.checkValidity()) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    this.classList.add('was-validated');
+  });
+</script>
+
+</body>
+</html>
