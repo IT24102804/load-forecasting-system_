@@ -18,6 +18,13 @@ public class Feedback {
     @Column(name = "user_email")
     private String userEmail;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "submitted_by_user_id")
+    private User submittedByUser;
+
+    @Column(name = "contact_email_snapshot")
+    private String contactEmailSnapshot;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "feedback_type", nullable = false)
     private FeedbackType feedbackType;
@@ -38,6 +45,24 @@ public class Feedback {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "load_forecast_run_id")
+    private LoadForecastRun loadForecastRun;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "anomaly_id")
+    private Anomaly anomaly;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "updated_by_user_id")
+    private User updatedByUser;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @Column(name = "subject_scope", length = 100)
+    private String subjectScope;
+
 
 
     // Constructors
@@ -56,6 +81,15 @@ public class Feedback {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        updatedAt = createdAt;
+        if (contactEmailSnapshot == null) {
+            contactEmailSnapshot = userEmail;
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 
     // ========== GETTERS AND SETTERS ==========
@@ -68,6 +102,12 @@ public class Feedback {
 
     public String getUserEmail() { return userEmail; }
     public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
+
+    public User getSubmittedByUser() { return submittedByUser; }
+    public void setSubmittedByUser(User submittedByUser) { this.submittedByUser = submittedByUser; }
+
+    public String getContactEmailSnapshot() { return contactEmailSnapshot; }
+    public void setContactEmailSnapshot(String contactEmailSnapshot) { this.contactEmailSnapshot = contactEmailSnapshot; }
 
     public FeedbackType getFeedbackType() { return feedbackType; }
     public void setFeedbackType(FeedbackType feedbackType) { this.feedbackType = feedbackType; }
@@ -86,6 +126,21 @@ public class Feedback {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LoadForecastRun getLoadForecastRun() { return loadForecastRun; }
+    public void setLoadForecastRun(LoadForecastRun loadForecastRun) { this.loadForecastRun = loadForecastRun; }
+
+    public Anomaly getAnomaly() { return anomaly; }
+    public void setAnomaly(Anomaly anomaly) { this.anomaly = anomaly; }
+
+    public User getUpdatedByUser() { return updatedByUser; }
+    public void setUpdatedByUser(User updatedByUser) { this.updatedByUser = updatedByUser; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getSubjectScope() { return subjectScope; }
+    public void setSubjectScope(String subjectScope) { this.subjectScope = subjectScope; }
 
     @Column(name = "prediction_id")
     private Long predictionId;

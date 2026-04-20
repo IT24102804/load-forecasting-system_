@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Reports', 'reports', ~{::content})}">
+<th:block th:fragment="content">
+
+    <div class="ui-card p-4">
+        <h4 class="fw-bold mb-2"><i class="fas fa-file-pdf me-2" style="color:var(--cobalt);"></i>Reports</h4>
+        <p class="text-muted mb-4">Export the full-chain report (Load Forecast → Generation Mix → Cost Prediction) as a PDF.</p>
+
+        <div class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label for="costRunId" class="form-label">Cost Run ID</label>
+                <input type="number" id="costRunId" class="form-control" min="1" step="1" required placeholder="e.g. 5">
+                <div class="form-text">Use the saved cost prediction run id.</div>
+            </div>
+            <div class="col-md-6">
+                <button id="exportBtn" class="btn btn-primary rounded-pill px-4 fw-bold" type="button" onclick="exportReport()">
+                    <i class="fas fa-download me-1"></i>Export Full-Chain PDF
+                </button>
+            </div>
+        </div>
+
+        <div id="reportError" class="alert alert-danger border-0 shadow-sm mt-4" style="display:none;"></div>
+    </div>
+
+    <script>
+        function showReportError(message) {
+            const box = document.getElementById('reportError');
+            box.textContent = message;
+            box.style.display = 'block';
+        }
+
+        function setExportBusy(isBusy) {
+            const btn = document.getElementById('exportBtn');
+            if (!btn) {
+                return;
+            }
+            if (!btn.dataset.originalHtml) {
+                btn.dataset.originalHtml = btn.innerHTML;
+            }
+            btn.disabled = isBusy;
+            btn.innerHTML = isBusy
+                ? '<span class="spinner-border spinner-border-sm me-2"></span>Exporting...'
+                : btn.dataset.originalHtml;
+        }
+
+        function downloadBlob(blob, filename) {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        }
+
+        async function exportReport() {
+            document.getElementById('reportError').style.display = 'none';
+            const input = document.getElementById('costRunId');
+            if (!input || !input.checkValidity()) {
+                input?.focus();
+                showReportError('Please enter a valid Cost Run ID.');
+                return;
+            }
+
+            const costRunId = Number.parseInt(input.value, 10);
+            if (!Number.isFinite(costRunId) || costRunId <= 0) {
+                input.focus();
+                showReportError('Please enter a valid Cost Run ID.');
+                return;
+            }
+
+            setExportBusy(true);
+            try {
+                const url = `/api/reports/full-chain/export?costRunId=${encodeURIComponent(String(costRunId))}`;
+                const response = await fetch(url);
+                const contentType = response.headers.get('content-type') || '';
+
+                if (response.ok && contentType.includes('application/pdf')) {
+                    const blob = await response.blob();
+                    downloadBlob(blob, `full-chain-report-${costRunId}.pdf`);
+                    return;
+                }
+
+                if (contentType.includes('application/json')) {
+                    const data = await response.json();
+                    throw new Error(data?.error || 'Failed to export report.');
+                }
+
+                const text = await response.text();
+                throw new Error(text || 'Failed to export report.');
+            } catch (e) {
+                showReportError(e?.message || 'Failed to export report.');
+            } finally {
+                setExportBusy(false);
+            }
+        }
+    </script>
+
+</th:block>
+</html>

@@ -6,7 +6,16 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+/**
+ * 
+ */
 @Repository
 public interface LoadRepository extends JpaRepository<LoadRequest, Long> {
+
+    /**
+     * 
+     * 
+     * @return 
+     */
     List<LoadRequest> findTop23ByOrderByIdDesc();
 }

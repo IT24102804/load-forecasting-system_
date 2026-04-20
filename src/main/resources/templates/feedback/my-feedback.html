@@ -1,248 +1,215 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="UTF-8">
-  <title>My Feedback - AI Load Forecasting</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-  <link th:href="@{/css/style.css}" rel="stylesheet">
-</head>
-<body>
-<!-- Simple Navigation -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-  <div class="container">
-    <a class="navbar-brand" href="/feedback/home">
-      <i class="fas fa-bolt me-2"></i>AI Load Forecasting
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Feedback Portal', 'feedback', ~{::content})}">
+<th:block th:fragment="content">
+
+
+
+
+<div th:if="${successMessage}"
+     class="alert alert-success alert-dismissible fade show border-0 shadow-sm mx-3 mt-3"
+     role="alert">
+  <i class="fas fa-check-circle me-2"></i>
+  <span th:text="${successMessage}"></span>
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+
+<div th:if="${errorMessage}"
+     class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mx-3 mt-3"
+     role="alert">
+  <i class="fas fa-exclamation-circle me-2"></i>
+  <span th:text="${errorMessage}"></span>
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+
+
+
+
+<div class="container pb-5">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="fw-bold mb-1"><i class="fas fa-history me-2" style="color: var(--cobalt);"></i>My Feedback History</h2>
+      <p class="text-muted mb-0" style="color: var(--slate) !important;">Track and manage your submitted feedback</p>
+      <div class="d-flex gap-2 mt-3 flex-wrap">
+        <a href="/feedback/home" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+          <i class="fas fa-house me-1"></i>Feedback Home
+        </a>
+        <a href="/feedback/submit" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+          <i class="fas fa-pen me-1"></i>Submit Feedback
+        </a>
+        <a th:if="${email != null and !email.isEmpty()}"
+           th:href="@{/feedback/my-feedback(email=${email})}"
+           class="btn btn-sm btn-primary rounded-pill px-3 fw-bold">
+          <i class="fas fa-history me-1"></i>My Feedback
+        </a>
+        <a th:unless="${email != null and !email.isEmpty()}"
+           href="/feedback/my-feedback"
+           class="btn btn-sm btn-primary rounded-pill px-3 fw-bold">
+          <i class="fas fa-history me-1"></i>My Feedback
+        </a>
+      </div>
+    </div>
+    <a href="/feedback/submit" class="btn btn-primary-custom rounded-pill px-4">
+      <i class="fas fa-plus me-2"></i>New Submission
     </a>
-    <div class="navbar-nav ms-auto">
-      <a class="nav-link" href="/feedback/submit">
-        <i class="fas fa-comment"></i> Submit Feedback
-      </a>
-      <a class="nav-link" href="/feedback/my-feedback">
-        <i class="fas fa-history"></i> My Feedback
-      </a>
-    </div>
   </div>
-</nav>
 
-<div class="container mt-5">
-  <div class="row mb-4">
-    <div class="col">
-      <h1><i class="fas fa-history text-primary me-2"></i>My Feedback History</h1>
-      <p class="text-muted">View all feedback you've submitted</p>
-    </div>
-    <div class="col-auto">
-      <a href="/feedback/submit" class="btn btn-primary">
-        <i class="fas fa-plus me-2"></i>New Feedback
-      </a>
-    </div>
-  </div>
-<!--
-
-  <div class="row mb-4">
+  <div class="row mb-5">
     <div class="col-md-8 mx-auto">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title mb-3">Find Your Feedback</h5>
-          <form class="row g-3" method="get" action="/feedback/my-feedback">
-            <div class="col-md-5">
-              <input type="email" class="form-control" name="email"
-                     placeholder="Search by Email" th:value="${searchValue}">
-            </div>
 
-            <div class="col-md-2">
-              <button type="submit" class="btn btn-primary w-100">
-                <i class="fas fa-search"></i>
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
-  -->
+      <div th:if="${email == null or email.isEmpty()}" class="ui-card p-4 text-center">
+        <h5 class="fw-bold mb-3" style="color: var(--navy);"><i class="fas fa-search me-2" style="color: var(--light-blue);"></i>Access Your History</h5>
+        <p class="small text-muted mb-4">Enter the email address you used to submit previous feedback.</p>
 
-  <!-- -- Search Form -->
-
-  <div class="row mb-4">
-    <div class="col-md-8 mx-auto text-center">
-      <div th:if="${email == null or email.isEmpty()}" class="card shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title mb-3"><i class="fas fa-search me-2"></i>Find Your Feedback</h5>
-          <form class="row g-3 justify-content-center" method="get" action="/feedback/my-feedback">
-            <div class="col-md-8">
-              <input type="email" class="form-control" name="email" id="manualEmailInput"
-                     placeholder="Enter the email you used" required>
-            </div>
-            <div class="col-md-3">
-              <button type="submit" class="btn btn-primary w-100" onclick="saveManualEmail()">
-                <i class="fas fa-search"></i> Search
-              </button>
-            </div>
-          </form>
-        </div>
+        <form id="searchForm" class="row g-2 justify-content-center" method="get" action="/feedback/my-feedback" novalidate>
+          <div class="col-md-8 text-start">
+            <input type="email" class="form-control py-2" name="email" id="manualEmailInput"
+                   placeholder="e.g., jane@example.com" required>
+            <div class="invalid-feedback">Please enter a valid email address.</div>
+          </div>
+          <div class="col-md-3">
+            <button type="submit" class="btn btn-primary-custom w-100 py-2">
+              <i class="fas fa-search me-1"></i> Retrieve
+            </button>
+          </div>
+        </form>
       </div>
 
-      <div th:if="${email != null and !email.isEmpty()}" class="d-flex justify-content-between align-items-center bg-light p-3 rounded border shadow-sm">
-        <span class="fs-6 text-secondary">
-          <i class="fas fa-filter me-2"></i>
-          Active Filter: <strong class="text-dark" th:text="${email}"></strong>
-        </span>
-        <a href="/feedback/my-feedback" class="btn btn-outline-secondary btn-sm" onclick="clearMemory()">
-          <i class="fas fa-times-circle me-1"></i> Clear Filter
+      <div th:if="${email != null and !email.isEmpty()}" class="ui-card p-3 d-flex justify-content-between align-items-center" style="background-color: rgba(130, 200, 229, 0.1); border-color: var(--light-blue);">
+        <div class="d-flex align-items-center">
+          <i class="fas fa-filter fs-4 me-3" style="color: var(--cobalt);"></i>
+          <div>
+            <span class="small text-uppercase fw-bold" style="color: var(--slate); letter-spacing: 1px;">Active Feedback Filter</span><br>
+            <strong class="fs-5" style="color: var(--navy);" th:text="${email}"></strong>
+          </div>
+        </div>
+        <a href="/feedback/my-feedback" class="btn btn-outline-secondary btn-sm rounded-pill px-3 fw-bold" onclick="clearMemory()">
+          <i class="fas fa-times me-1"></i> Clear Filter
         </a>
       </div>
     </div>
   </div>
 
-
-
-
-  <!-- Feedback List -->
   <div th:if="${hasFeedback}" class="row">
     <div class="col-12">
-      <div class="alert alert-info" th:if="${searchType == 'email'}">
-        <i class="fas fa-envelope me-2"></i>Showing feedback for: <strong th:text="${displayIdentifier}"></strong>
-      </div>
-      <div class="alert alert-info" th:if="${searchType == 'name'}">
-        <i class="fas fa-user me-2"></i>Showing feedback for: <strong th:text="${displayIdentifier}"></strong>
-      </div>
-    </div>
+      <div th:each="fb : ${feedbacks}" class="ui-card feedback-card mb-4 p-0">
 
-    <div class="col-12">
-      <div th:each="fb : ${feedbacks}" class="card mb-3 shadow-sm">
-        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <div class="feedback-header px-4 py-3 d-flex justify-content-between align-items-center">
           <div>
-            <span class="badge bg-primary me-2" th:text="${fb.feedbackType.toString().replace('_', ' ')}">Type</span>
+            <span class="badge bg-dark me-2" th:text="${fb.feedbackType.toString().replace('_', ' ')}">Type</span>
 
-            <!-- Status Badge -->
-            <span class="badge" th:classappend="${fb.status == 'PENDING'} ? 'bg-warning' :
-                                                                  (${fb.status == 'ACKNOWLEDGED'} ? 'bg-info' :
-                                                                  (${fb.status == 'RESOLVED'} ? 'bg-success' : 'bg-secondary'))"
+            <span class="badge" th:classappend="${fb.status == 'PENDING'} ? 'bg-warning text-dark' :
+                                                              (${fb.status == 'ACKNOWLEDGED'} ? 'bg-info text-dark' :
+                                                              (${fb.status == 'RESOLVED'} ? 'bg-success' : 'bg-secondary'))"
                   th:text="${fb.status}">Status</span>
           </div>
-          <small class="text-muted" th:text="${fb.formattedDate}">Date</small>
+          <small class="fw-bold" style="color: var(--slate);" th:text="${fb.formattedDate}">Date</small>
         </div>
 
-        <div class="card-body">
-          <!-- Rating Stars -->
-          <div th:if="${fb.rating}" class="mb-2">
-                            <span th:each="i : ${#numbers.sequence(1, 5)}">
-                                <i class="fas fa-star" th:classappend="${i <= fb.rating} ? 'text-warning' : 'text-secondary'"></i>
-                            </span>
-            <span class="ms-2 text-muted" th:text="'(' + ${fb.rating} + '/5)'"></span>
+        <div class="p-4">
+          <div th:if="${fb.rating}" class="mb-3">
+                        <span th:each="i : ${#numbers.sequence(1, 5)}">
+                            <i class="fas fa-star" th:classappend="${i <= fb.rating} ? 'text-warning' : 'text-secondary opacity-25'"></i>
+                        </span>
           </div>
 
-          <!-- Feedback Message -->
-          <p class="card-text fs-5" th:text="${fb.message}">Feedback message</p>
+          <p class="fs-5 mb-0" style="color: var(--navy);" th:text="${fb.message}">Feedback message</p>
 
-          <!-- Admin Reply Section - This appears automatically when reply exists -->
-          <div th:if="${fb.adminReply}" class="mt-3 p-3 bg-light rounded border-start border-4 border-primary">
+          <div th:if="${fb.adminReply}" class="admin-reply-box mt-4 p-3">
             <div class="d-flex">
-              <div class="me-3">
-                <i class="fas fa-reply fa-rotate-180 text-primary fs-4"></i>
+              <div class="me-3 mt-1">
+                <i class="fas fa-user-shield fs-4" style="color: var(--cobalt);"></i>
               </div>
               <div>
-                <strong class="text-primary">Admin Response:</strong>
-                <p class="mb-0 mt-1" th:text="${fb.adminReply}">Admin reply</p>
-                <small class="text-muted d-block mt-2">
-                  <i class="fas fa-check-circle text-success me-1"></i>
-                  Status updated to: <span th:text="${fb.status}"></span>
-                </small>
+                <strong class="text-uppercase small fw-bold" style="color: var(--cobalt); letter-spacing: 0.5px;">Admin Response</strong>
+                <p class="mb-0 mt-1" style="color: var(--navy);" th:text="${fb.adminReply}">Admin reply</p>
               </div>
             </div>
           </div>
 
-          <!-- No Reply Yet Message -->
-          <div th:unless="${fb.adminReply}" class="mt-3 text-muted fst-italic">
-            <i class="fas fa-clock me-1"></i> Awaiting admin response
+          <div th:unless="${fb.adminReply}" class="mt-4 pt-3 border-top border-light text-muted small fw-bold">
+            <i class="fas fa-clock me-1" style="color: var(--slate);"></i> Awaiting administrator review
           </div>
 
-          <!-- ===== NEW: EDIT/DELETE BUTTONS ===== -->
-          <!-- Action Buttons - Only show if no admin reply -->
-          <div class="mt-3 d-flex justify-content-end gap-2 border-top pt-3">
-
-            <!-- EDIT BUTTON - Only if no admin reply -->
+          <div class="mt-4 d-flex justify-content-end gap-2">
             <a th:if="${fb.adminReply == null or fb.adminReply.isEmpty()}"
                th:href="@{/feedback/edit/{id}(id=${fb.id}, email=${email})}"
-               class="btn btn-warning btn-sm">
+               class="btn btn-outline-primary btn-sm px-3 fw-bold rounded-pill">
               <i class="fas fa-edit me-1"></i> Edit
             </a>
 
-            <!-- DELETE BUTTON - Only if no admin reply -->
             <form th:if="${fb.adminReply == null or fb.adminReply.isEmpty()}"
                   th:action="@{/feedback/delete/{id}(id=${fb.id})}"
                   method="post"
-                  onsubmit="return confirm('Are you sure you want to delete this feedback? This action cannot be undone.');"
+                  onsubmit="return confirm('Delete this feedback record? This action cannot be undone.');"
                   style="display: inline;">
               <input type="hidden" name="email" th:value="${email}">
-              <button type="submit" class="btn btn-danger btn-sm">
-                <i class="fas fa-trash me-1"></i> Delete
+              <button type="submit" class="btn btn-outline-danger btn-sm px-3 fw-bold rounded-pill">
+                <i class="fas fa-trash-alt me-1"></i> Delete
               </button>
             </form>
 
-            <!-- If admin already replied, show locked message -->
-            <span th:if="${fb.adminReply != null and !fb.adminReply.isEmpty()}"
-                  class="text-muted small">
-              <i class="fas fa-lock me-1"></i> Locked (admin replied)
-            </span>
+            <span th:if="${fb.adminReply != null and !fb.adminReply.isEmpty()}" class="badge bg-light text-secondary border px-3 py-2">
+                            <i class="fas fa-lock me-1"></i> Locked (Resolved)
+                        </span>
           </div>
-          <!-- ===== END OF EDIT/DELETE BUTTONS ===== -->
+        </div>
 
-        </div>  <!-- This closes the card-body -->
-
-        <div class="card-footer bg-white">
-          <small class="text-muted">
-            <i class="fas fa-tag me-1"></i> ID: <span th:text="${fb.id}"></span>
+        <div class="card-footer bg-white border-top-0 px-4 pb-3 pt-0">
+          <small style="color: var(--slate);">
+            <i class="fas fa-fingerprint me-1"></i> Record ID: <span th:text="${fb.id}"></span>
           </small>
         </div>
-      </div>  <!-- This closes the card -->
-    </div>
-  </div>  <!-- This closes the feedback list row -->
-
-  <!-- No Results -->
-  <div th:unless="${hasFeedback}" class="row">
-    <div class="col-12 text-center py-5">
-      <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
-      <h3 class="text-muted">No Feedback Found</h3>
-      <p th:if="${searchValue}" class="text-muted">No feedback for <strong th:text="${displayIdentifier}"></strong></p>
-      <p th:unless="${searchValue}" class="text-muted">Enter your email or name above to view your feedback</p>
-      <a href="/feedback/submit" class="btn btn-primary mt-3">
-        <i class="fas fa-plus me-2"></i>Submit Your First Feedback
-      </a>
+      </div>
     </div>
   </div>
-</div>  <!-- This closes the container -->
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <div th:unless="${hasFeedback}" class="row">
+    <div class="col-12 text-center py-5 mt-4">
+      <div class="d-inline-block p-4 rounded-circle mb-3" style="background-color: rgba(109, 129, 150, 0.1);">
+        <i class="fas fa-inbox fa-3x" style="color: var(--slate);"></i>
+      </div>
+      <h4 class="fw-bold" style="color: var(--navy);">No Feedback Found</h4>
+      <p th:if="${email != null and !email.isEmpty()}" style="color: var(--slate);">No feedback records match the email <strong th:text="${email}"></strong></p>
+      <p th:unless="${email != null and !email.isEmpty()}" style="color: var(--slate);">Provide your email above to query the database.</p>
+    </div>
+  </div>
+</div>
 
 <script>
-  // 1. Check memory on page load if no email is in the URL
+  // 1. Check memory on page load
   window.onload = function() {
     const urlParams = new URLSearchParams(window.location.search);
-
-    // Only run the "Magic Redirect" if we aren't already looking at a result
     if (!urlParams.has('email')) {
       const savedEmail = localStorage.getItem('savedFeedbackEmail');
       if (savedEmail) {
-        // If we found a saved email, redirect to show their history automatically
         window.location.href = '/feedback/my-feedback?email=' + encodeURIComponent(savedEmail);
       }
     }
   };
 
-  // 2. Save the email when the user clicks the Search button
-  function saveManualEmail() {
-    const input = document.getElementById('manualEmailInput').value;
-    if (input && input.includes('@')) {
-      localStorage.setItem('savedFeedbackEmail', input);
-    }
-  }
-
-  // 3. Clear memory when they want to reset the filter
+  // 2. Clear memory
   function clearMemory() {
     localStorage.removeItem('savedFeedbackEmail');
   }
+
+  // 3. UPGRADED: Form Validation & Save Logic
+  const searchForm = document.getElementById('searchForm');
+  if (searchForm) {
+    searchForm.addEventListener('submit', function(event) {
+      if (!this.checkValidity()) {
+        event.preventDefault();
+        event.stopPropagation();
+      } else {
+        // If valid, save to memory before submitting
+        const input = document.getElementById('manualEmailInput').value;
+        if (input && input.includes('@')) {
+          localStorage.setItem('savedFeedbackEmail', input);
+        }
+      }
+      this.classList.add('was-validated');
+    });
+  }
 </script>
-</body>
+</th:block>
 </html>

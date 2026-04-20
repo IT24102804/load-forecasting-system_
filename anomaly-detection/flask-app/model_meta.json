@@ -1,0 +1,50 @@
+{
+  "dataset_path": "D:\\a yr 2 sem 2\\AIML project\\load_forecasting_dataset_corrected.csv",
+  "feature_order": [
+    "load",
+    "temp",
+    "humidity",
+    "hour",
+    "day",
+    "month",
+    "event",
+    "season"
+  ],
+  "day_encoding": "Monday=1, Tuesday=2, Wednesday=3, Thursday=4, Friday=5, Saturday=6, Sunday=7",
+  "season_encoding": {
+    "Mar-May": 0,
+    "Jun-Aug": 1,
+    "Sep-Nov": 2,
+    "Dec-Feb": 3
+  },
+  "train_rows": 132921,
+  "validation_rows": 28483,
+  "test_rows": 28484,
+  "validation_anomaly_fraction": 0.1,
+  "selected_model": "local_outlier_factor",
+  "selected_hyperparameters": {
+    "contamination": 0.02,
+    "n_neighbors": 20
+  },
+  "validation_results": {
+    "precision": 0.8233401579409184,
+    "recall": 0.9884129213483146,
+    "f1": 0.8983564704005106,
+    "pr_auc": 0.9933720223203814,
+    "true_negatives": 27879,
+    "false_positives": 604,
+    "false_negatives": 33,
+    "true_positives": 2815
+  },
+  "test_results": {
+    "precision": 0.8168604651162791,
+    "recall": 0.9866573033707865,
+    "f1": 0.8937659033078881,
+    "pr_auc": 0.9929798697763293,
+    "true_negatives": 27854,
+    "false_positives": 630,
+    "false_negatives": 38,
+    "true_positives": 2810
+  },
+  "training_sample_limit": 40000
+}

@@ -1,4 +1,4 @@
-package com.example.loadforcasting;
+package com.example.loadforcasting.Controller;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,11 +13,15 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // Disables CSRF protection so your 'POST' request can go through
                 .csrf(csrf -> csrf.disable())
-                // Permits all requests so you don't get redirected to the login page
                 .authorizeHttpRequests(auth -> auth
                         .anyRequest().permitAll()
+                )
+                .logout(logout -> logout
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl("/")
+                        .invalidateHttpSession(true)
+                        .permitAll()
                 );
         return http.build();
     }

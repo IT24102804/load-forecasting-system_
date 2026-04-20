@@ -3,61 +3,90 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Feedback Reply</title>
+    <title>Admin Feedback - AI Load Forecasting</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet"/>
-    <link href="style.css" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <link rel="stylesheet" href="/css/main.css">
+
 </head>
 <body>
 
 <div class="d-flex">
     <div class="sidebar">
-        <h4 class="text-center py-4 text-white fw-bold">⚡ Admin Panel</h4>
-        <hr class="text-white"/>
-        <a href="index.html"><i class="bi bi-speedometer2"></i> Dashboard</a>
-        <a href="users.html"><i class="bi bi-people"></i> User Management</a>
-        <a href="monitoring.html"><i class="bi bi-graph-up"></i> Model Monitoring</a>
-        <a href="feedback.html" class="active"><i class="bi bi-chat-left-text"></i> Feedback Reply</a>
-        <hr class="text-white"/>
-        <a href="#"><i class="bi bi-box-arrow-left"></i> Logout</a>
+        <div class="sidebar-brand">
+            <i class="fas fa-shield-alt me-2" style="color: var(--light-blue);"></i> Admin Portal
+        </div>
+
+        <div class="mt-3 flex-grow-1">
+            <a href="index.html"><i class="fas fa-tachometer-alt me-3 text-center" style="width: 20px;"></i> Dashboard</a>
+            <a href="users.html"><i class="fas fa-users me-3 text-center" style="width: 20px;"></i> User Management</a>
+            <a href="monitoring.html"><i class="fas fa-chart-line me-3 text-center" style="width: 20px;"></i> Model Monitoring</a>
+            <a href="feedback.html" class="active"><i class="fas fa-comments me-3 text-center" style="width: 20px;"></i> Feedback Reply</a>
+        </div>
+
+        <div class="mb-3 border-top" style="border-color: rgba(255,255,255,0.1) !important;">
+            <a href="/public-site"><i class="fas fa-external-link-alt me-3 text-center" style="width: 20px;"></i> View Public Site</a>
+            <a href="#"><i class="fas fa-sign-out-alt me-3 text-center" style="width: 20px; color: #ff6b6b;"></i> Logout</a>
+        </div>
     </div>
 
     <div class="main-content w-100">
-        <nav class="navbar navbar-light bg-white shadow-sm px-4">
-            <span class="navbar-brand fw-bold">Feedback Reply</span>
-            <span class="text-muted">Welcome, Admin 👋</span>
-        </nav>
+        <div class="top-navbar">
+            <h5 class="mb-0 fw-bold" style="color: var(--navy);">Feedback Management</h5>
+            <div class="d-flex align-items-center">
+                <span class="text-muted fw-semibold me-3">Welcome, Administrator</span>
+                <div class="rounded-circle bg-light d-flex align-items-center justify-content-center border" style="width: 40px; height: 40px; color: var(--cobalt);">
+                    <i class="fas fa-user-tie"></i>
+                </div>
+            </div>
+        </div>
 
-        <div class="container-fluid py-4 px-4">
-            <h5 class="fw-bold mb-3">User Feedbacks</h5>
+        <div class="container-fluid py-4 px-4" style="max-width: 900px; margin: 0 auto;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="fw-bold mb-0" style="color: var(--navy);"><i class="fas fa-inbox me-2" style="color: var(--cobalt);"></i>User Feedback Queue</h4>
+                <button class="btn btn-outline-secondary btn-sm" onclick="loadFeedbacks()">
+                    <i class="fas fa-sync-alt me-1"></i> Refresh
+                </button>
+            </div>
+
             <div id="feedbackContainer">
-                <div class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <p class="mt-2 text-muted">Loading feedbacks...</p>
+                <div class="text-center py-5 ui-card">
+                    <div class="spinner-border" style="color: var(--cobalt);" role="status"></div>
+                    <p class="mt-3 text-muted fw-bold">Connecting to database...</p>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- REPLY MODAL -->
 <div class="modal fade" id="replyModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Reply to Feedback</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header text-white" style="background-color: var(--navy);">
+                <h5 class="modal-title fw-bold"><i class="fas fa-reply me-2"></i>Respond to User</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
                 <input type="hidden" id="replyFeedbackId"/>
-                <p id="replyOriginalMessage" class="text-muted border-start ps-3 mb-3"></p>
-                <label class="form-label fw-bold">Your Reply</label>
-                <textarea class="form-control" id="replyText" rows="3" placeholder="Type your reply here..."></textarea>
+
+                <div class="mb-4 p-3 rounded bg-light border-start border-4" style="border-color: var(--slate) !important;">
+                    <small class="text-uppercase fw-bold text-muted d-block mb-1" style="font-size: 0.75rem;">Original Feedback</small>
+                    <p id="replyOriginalMessage" class="mb-0 text-dark font-italic"></p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label fw-bold" style="color: var(--navy);">Official Admin Reply <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="replyText" rows="4" placeholder="Draft your response here to resolve this ticket..."></textarea>
+                    <div id="replyError" class="invalid-feedback fw-semibold">
+                        <i class="fas fa-exclamation-circle me-1"></i> Response cannot be empty.
+                    </div>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-success" onclick="submitReply()">
-                    <i class="bi bi-send"></i> Send Reply
+            <div class="modal-footer bg-light">
+                <button class="btn btn-outline-secondary fw-bold" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary-custom px-4" onclick="submitReply()">
+                    <i class="fas fa-paper-plane me-2"></i> Submit & Resolve
                 </button>
             </div>
         </div>
@@ -66,8 +95,19 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    // Create an instance of the modal for better programmatic control
+    let replyModalInstance;
+
+    document.addEventListener("DOMContentLoaded", function() {
+        replyModalInstance = new bootstrap.Modal(document.getElementById('replyModal'));
+
+        // Remove error styling when user starts typing
+        document.getElementById('replyText').addEventListener('input', function() {
+            this.classList.remove('is-invalid');
+        });
+    });
+
     function loadFeedbacks() {
-        // 1. Updated URL to match your new Admin Controller
         fetch("/api/admin/feedback")
             .then(function(res) { return res.json(); })
             .then(function(feedbacks) {
@@ -75,44 +115,45 @@
                 container.innerHTML = "";
 
                 if (feedbacks.length === 0) {
-                    container.innerHTML = "<p class='text-muted'>No feedbacks found.</p>";
+                    container.innerHTML = '<div class="text-center py-5 ui-card"><i class="fas fa-check-circle fa-3x mb-3" style="color: #28a745;"></i><h5 class="text-muted">No pending feedback in the queue!</h5></div>';
                     return;
                 }
 
                 feedbacks.forEach(function(fb) {
-                    // 2. Updated status check to match your Enum (RESOLVED)
+                    // Match UI tags from user-facing side
                     var statusBadge = fb.status === "RESOLVED"
-                        ? '<span class="badge bg-success ms-2">Resolved</span>'
-                        : '<span class="badge bg-warning text-dark ms-2">Pending</span>';
+                        ? '<span class="badge bg-success px-2 py-1 rounded-pill"><i class="fas fa-check me-1"></i>Resolved</span>'
+                        : '<span class="badge bg-warning text-dark px-2 py-1 rounded-pill"><i class="fas fa-clock me-1"></i>Pending</span>';
 
                     var replySection = "";
-                    // 3. Updated from fb.reply to fb.adminReply
                     if (fb.adminReply) {
-                        replySection = '<div class="alert alert-success py-2 mt-2">' +
-                            '<strong>Admin Reply:</strong> ' + fb.adminReply + '</div>';
+                        replySection =
+                            '<div class="mt-3 p-3 rounded" style="background-color: rgba(0, 71, 171, 0.05); border-left: 3px solid var(--cobalt);">' +
+                            '<small class="text-uppercase fw-bold d-block mb-1" style="color: var(--cobalt); font-size: 0.75rem;"><i class="fas fa-user-shield me-1"></i>Administrator Response</small>' +
+                            '<p class="mb-0 text-dark">' + fb.adminReply + '</p>' +
+                            '</div>';
                     }
 
                     var replyButton = fb.status === "RESOLVED"
-                        ? '<button class="btn btn-secondary btn-sm mt-2" disabled><i class="bi bi-check"></i> Replied</button>'
-                        : '<button class="btn btn-primary btn-sm mt-2" onclick="openReplyModal(' + fb.id + ', \'' + fb.message + '\')">' +
-                        '<i class="bi bi-reply"></i> Reply</button>';
+                        ? '<button class="btn btn-outline-secondary btn-sm mt-3 px-3 fw-bold rounded-pill" disabled><i class="fas fa-lock me-1"></i> Resolved</button>'
+                        : '<button class="btn btn-primary-custom btn-sm mt-3 px-3 rounded-pill" onclick="openReplyModal(' + fb.id + ', \'' + fb.message.replace(/'/g, "\\'") + '\')"><i class="fas fa-reply me-1"></i> Draft Reply</button>';
 
                     var card = document.createElement("div");
-                    card.className = "card shadow-sm border-0 mb-3";
+                    card.className = "card ui-card mb-4 border-0";
                     card.innerHTML =
-                        '<div class="card-body">' +
-                        '<div class="d-flex justify-content-between align-items-center mb-2">' +
+                        '<div class="card-body p-4">' +
+                        '<div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">' +
                         '<div>' +
-                        // 4. Updated from fb.username and fb.email to your variables
-                        '<strong>' + (fb.userName || 'Anonymous') + '</strong>' +
-                        '<span class="text-muted ms-2" style="font-size:13px;">' + fb.userEmail + '</span>' +
+                        '<i class="fas fa-user-circle fs-4 me-2 align-middle text-muted"></i>' +
+                        '<strong class="align-middle" style="color: var(--navy);">' + (fb.userName || 'Anonymous User') + '</strong>' +
+                        '<span class="text-muted ms-2 me-3 small">(' + fb.userEmail + ')</span>' +
                         statusBadge +
                         '</div>' +
-                        '<small class="text-muted">ID: ' + fb.id + '</small>' +
+                        '<span class="text-muted small fw-bold"><i class="fas fa-ticket-alt me-1"></i>Ticket #' + fb.id + '</span>' +
                         '</div>' +
-                        '<p class="mb-2">' + fb.message + '</p>' +
+                        '<p class="fs-6 mb-2" style="color: #333;">"' + fb.message + '"</p>' +
                         replySection +
-                        replyButton +
+                        '<div class="text-end">' + replyButton + '</div>' +
                         '</div>';
 
                     container.appendChild(card);
@@ -120,32 +161,43 @@
             })
             .catch(function() {
                 document.getElementById("feedbackContainer").innerHTML =
-                    '<div class="alert alert-danger">Backend not connected. Please run the Spring Boot server.</div>';
+                    '<div class="alert alert-danger shadow-sm border-0"><i class="fas fa-exclamation-triangle me-2"></i>Backend API disconnected. Ensure the Spring Boot server is running on port 8080.</div>';
             });
     }
 
     function openReplyModal(id, message) {
         document.getElementById("replyFeedbackId").value = id;
-        document.getElementById("replyOriginalMessage").innerText = message;
-        document.getElementById("replyText").value = "";
-        new bootstrap.Modal(document.getElementById("replyModal")).show();
+        document.getElementById("replyOriginalMessage").innerText = '"' + message + '"';
+
+        var replyInput = document.getElementById("replyText");
+        replyInput.value = "";
+        replyInput.classList.remove('is-invalid'); // Clear any old errors
+
+        replyModalInstance.show();
     }
 
     function submitReply() {
         var id = document.getElementById("replyFeedbackId").value;
-        var replyText = document.getElementById("replyText").value.trim();
+        var replyInput = document.getElementById("replyText");
+        var replyText = replyInput.value.trim();
 
+        // Native UI Validation instead of standard alert()
         if (replyText === "") {
-            alert("Please type a reply first!");
+            replyInput.classList.add('is-invalid');
+            replyInput.focus();
             return;
         }
 
-        // 5. Updated payload to use adminReply
         var feedbackData = {
             adminReply: replyText
         };
 
-        // 6. Updated URL
+        // Temporary Loading State on Button
+        var btn = event.currentTarget;
+        var originalBtnHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Sending...';
+        btn.disabled = true;
+
         fetch("/api/admin/feedback/" + id, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -156,13 +208,17 @@
                 return res.json();
             })
             .then(function() {
-                alert("Reply sent successfully!");
-                bootstrap.Modal.getInstance(document.getElementById("replyModal")).hide();
+                replyModalInstance.hide();
                 loadFeedbacks(); // Refresh the list
             })
             .catch(function(err) {
-                alert("Error sending reply. Make sure backend is running!");
+                alert("Critical Error: Could not send reply. Verify backend connection.");
                 console.error(err);
+            })
+            .finally(function() {
+                // Restore button state
+                btn.innerHTML = originalBtnHtml;
+                btn.disabled = false;
             });
     }
 

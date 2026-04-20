@@ -1,0 +1,238 @@
+﻿.weather-shell {
+    max-width: 1320px;
+    margin: 0 auto;
+}
+
+.weather-summary-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.7rem 1rem;
+    border-radius: 999px;
+    background: rgba(130, 200, 229, 0.14);
+    color: var(--navy);
+    font-weight: 600;
+    border: 1px solid rgba(0, 71, 171, 0.12);
+}
+
+.weather-tab-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.weather-tab-button {
+    background: var(--white);
+    color: var(--cobalt);
+    border: 1px solid rgba(0, 71, 171, 0.15);
+    border-radius: 999px;
+    padding: 0.75rem 1.2rem;
+    font-weight: 700;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+}
+
+.weather-tab-button:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.weather-tab-button.active {
+    background: var(--cobalt);
+    color: var(--white);
+    border-color: var(--cobalt);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.weather-panel {
+    overflow: hidden;
+}
+
+.weather-flash {
+    display: none;
+    margin-top: 1rem;
+    padding: 0.95rem 1rem;
+    border-radius: 10px;
+    font-weight: 500;
+    border-left: 4px solid transparent;
+}
+
+.weather-flash.success {
+    display: block;
+    background: rgba(40, 167, 69, 0.1);
+    color: #1f6b35;
+    border-left-color: var(--success);
+}
+
+.weather-flash.error {
+    display: block;
+    background: rgba(220, 53, 69, 0.1);
+    color: #9f2230;
+    border-left-color: var(--danger);
+}
+
+.weather-helper {
+    background: rgba(130, 200, 229, 0.12);
+    border: 1px solid rgba(0, 71, 171, 0.08);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    color: var(--slate);
+    font-size: 0.9rem;
+}
+
+.weather-forecast-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 1rem;
+}
+
+.weather-forecast-item {
+    background: rgba(130, 200, 229, 0.08);
+    border: 1px solid rgba(0, 71, 171, 0.08);
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.weather-forecast-label {
+    color: var(--slate);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+}
+
+.weather-forecast-value {
+    color: var(--navy);
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.weather-empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.weather-empty-state i {
+    font-size: 2.5rem;
+    color: var(--slate);
+    margin-bottom: 0.8rem;
+}
+
+.weather-history-table th,
+.weather-history-table td {
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.weather-action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.weather-stat-card {
+    padding: 1.2rem;
+    text-align: center;
+}
+
+.weather-stat-title {
+    color: var(--slate);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    margin-bottom: 0.65rem;
+}
+
+.weather-stat-number {
+    color: var(--navy);
+    font-size: 1.3rem;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.weather-chart-container {
+    position: relative;
+    min-height: 320px;
+}
+
+.weather-summary-list {
+    padding-left: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.9rem;
+}
+
+.weather-summary-list li {
+    padding: 0.9rem 1rem;
+    border-radius: 10px;
+    background: rgba(130, 200, 229, 0.08);
+    border: 1px solid rgba(0, 71, 171, 0.08);
+    color: var(--slate);
+}
+
+.weather-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+    padding: 1rem;
+}
+
+.weather-modal.active {
+    display: flex;
+}
+
+.weather-modal-content {
+    width: min(460px, 100%);
+    background: var(--white);
+    border-radius: 14px;
+    box-shadow: var(--shadow-md);
+    padding: 1.5rem;
+}
+
+.weather-modal-content h5 {
+    margin-bottom: 0.6rem;
+    font-weight: 700;
+    color: var(--navy);
+}
+
+.weather-modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    .weather-tab-bar {
+        flex-direction: column;
+    }
+
+    .weather-tab-button {
+        width: 100%;
+        text-align: center;
+    }
+
+    .weather-chart-container {
+        min-height: 240px;
+    }
+
+    .weather-history-table th,
+    .weather-history-table td {
+        white-space: normal;
+    }
+}

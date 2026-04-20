@@ -1,0 +1,331 @@
+/* ============================================================
+   main.css — AI Load Forecasting System
+   Single shared stylesheet. Import this in every HTML page.
+   DO NOT add duplicate styles inside <style> tags in HTML files.
+   ============================================================ */
+
+/* ---------- CSS Variables (Theme) ---------- */
+:root {
+    --cobalt: #0047AB;
+    --navy: #000080;
+    --light-blue: #82C8E5;
+    --slate: #6D8196;
+    --bg-color: #F4F7F9;
+    --white: #ffffff;
+    --danger: #dc3545;
+    --success: #28a745;
+    --warning: #FFC107;
+    --border-color: rgba(109, 129, 150, 0.2);
+    --shadow-sm: 0 4px 6px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* ---------- Base ---------- */
+* { box-sizing: border-box; }
+
+body {
+    background-color: var(--bg-color);
+    font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    color: var(--navy);
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+/* ---------- Navbar ---------- */
+.navbar-custom {
+    background-color: var(--navy);
+    box-shadow: var(--shadow-sm);
+}
+.navbar-custom .navbar-brand {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--white) !important;
+}
+.navbar-custom .nav-link {
+    color: rgba(255, 255, 255, 0.8) !important;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+.navbar-custom .nav-link:hover,
+.navbar-custom .nav-link.active {
+    color: var(--white) !important;
+}
+.navbar-custom .nav-link.active {
+    border-bottom: 2px solid var(--light-blue);
+}
+
+/* ---------- Sidebar (Admin) ---------- */
+.sidebar {
+    width: 260px;
+    min-height: 100vh;
+    background-color: var(--navy);
+    box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+}
+.sidebar-brand {
+    padding: 1.5rem;
+    color: var(--white);
+    font-size: 1.1rem;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    letter-spacing: 0.5px;
+    text-decoration: none;
+    display: block;
+}
+.sidebar a {
+    display: flex;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border-left: 4px solid transparent;
+}
+.sidebar a:hover {
+    background-color: rgba(0, 71, 171, 0.5);
+    color: var(--white);
+}
+.sidebar a.active {
+    background-color: var(--cobalt);
+    color: var(--white);
+    border-left-color: var(--light-blue);
+}
+.sidebar a i { width: 20px; text-align: center; margin-right: 12px; }
+.sidebar-footer {
+    margin-top: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ---------- Top bar (Admin pages) ---------- */
+.top-navbar {
+    background-color: var(--white);
+    padding: 1rem 2rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+/* ---------- Cards ---------- */
+.ui-card {
+    background-color: var(--white);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+}
+
+.ui-card .p-4 {
+    padding: 1.25rem !important;
+}
+
+.ui-card .p-5 {
+    padding: 2rem !important;
+}
+.card-header-custom {
+    background-color: rgba(130, 200, 229, 0.1);
+    border-bottom: 1px solid rgba(109, 129, 150, 0.1);
+    padding: 1rem 1.5rem;
+}
+.feature-card {
+    background-color: var(--white);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: var(--shadow-md);
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(0, 71, 171, 0.1);
+    border-color: var(--light-blue);
+}
+
+/* ---------- Metric Cards (Dashboard) ---------- */
+.metric-card {
+    border-radius: 12px;
+    border: none;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease;
+}
+.metric-card:hover { transform: translateY(-5px); }
+.metric-card .card-body { padding: 1.5rem; position: relative; z-index: 2; }
+.metric-card .card-body { padding: 1.15rem; }
+.metric-card .icon-bg {
+    position: absolute;
+    right: -10px;
+    bottom: -20px;
+    font-size: 6rem;
+    opacity: 0.15;
+    z-index: 1;
+}
+.bg-navy-grad   { background: linear-gradient(135deg, var(--navy), #001F4D); color: var(--white); }
+.bg-cobalt-grad { background: linear-gradient(135deg, var(--cobalt), #0056B3); color: var(--white); }
+.bg-slate-grad  { background: linear-gradient(135deg, var(--slate), #4B5E70); color: var(--white); }
+.bg-warning-grad { background: linear-gradient(135deg, #FFB300, #FF8F00); color: #333; }
+.bg-danger-grad  { background: linear-gradient(135deg, #dc3545, #a71d2a); color: var(--white); }
+.bg-success-grad { background: linear-gradient(135deg, #28a745, #1a6e2e); color: var(--white); }
+
+/* ---------- Buttons ---------- */
+.btn-primary-custom {
+    background-color: var(--cobalt);
+    border: none;
+    color: var(--white);
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+    text-decoration: none;
+    display: inline-block;
+}
+.btn-primary-custom:hover {
+    background-color: var(--navy);
+    color: var(--white);
+}
+.btn-outline-custom {
+    border: 1px solid var(--cobalt);
+    color: var(--cobalt);
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    background: transparent;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-block;
+}
+.btn-outline-custom:hover {
+    background-color: var(--cobalt);
+    color: var(--white);
+}
+
+/* ---------- Forms ---------- */
+.form-label {
+    color: var(--navy);
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 0.4rem;
+}
+.form-control, .form-select {
+    border: 1px solid var(--light-blue);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    color: var(--navy);
+    transition: all 0.2s ease-in-out;
+}
+.form-control:focus, .form-select:focus {
+    border-color: var(--cobalt);
+    box-shadow: 0 0 0 3px rgba(0, 71, 171, 0.15);
+    outline: none;
+}
+.form-control:disabled, .form-control[readonly] {
+    background-color: #f8f9fa;
+    border-color: #e9ecef;
+    color: var(--slate);
+    cursor: not-allowed;
+}
+.form-text { color: var(--slate); font-size: 0.8rem; }
+
+/* ---------- Severity Badges ---------- */
+.badge-high    { background-color: #dc3545; color: white; }
+.badge-medium  { background-color: #FFC107; color: #333; }
+.badge-low     { background-color: #28a745; color: white; }
+.badge-pending { background-color: #FFC107; color: #333; }
+.badge-resolved { background-color: #28a745; color: white; }
+.badge-acknowledged { background-color: #17a2b8; color: white; }
+
+/* ---------- Status Indicators ---------- */
+.status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+}
+.status-dot.high    { background-color: #dc3545; }
+.status-dot.medium  { background-color: #FFC107; }
+.status-dot.low     { background-color: #28a745; }
+
+/* ---------- Anomaly-specific ---------- */
+.anomaly-row-high   { border-left: 4px solid #dc3545 !important; }
+.anomaly-row-medium { border-left: 4px solid #FFC107 !important; }
+.anomaly-row-low    { border-left: 4px solid #28a745 !important; }
+
+.anomaly-warning {
+    background-color: #FFF9E6;
+    border-left: 4px solid var(--warning);
+    border-radius: 6px;
+    padding: 20px;
+}
+.admin-reply-box {
+    background-color: rgba(0, 71, 171, 0.03);
+    border-left: 4px solid var(--cobalt);
+    border-radius: 0 8px 8px 0;
+    padding: 1rem;
+}
+
+/* ---------- Star Rating ---------- */
+.rating { display: flex; flex-direction: row-reverse; justify-content: flex-end; }
+.rating input { display: none; }
+.rating label {
+    cursor: pointer;
+    width: 45px;
+    height: 45px;
+    background: rgba(109, 129, 150, 0.1);
+    color: var(--slate);
+    margin: 0 4px 0 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    transition: all 0.2s ease;
+}
+.rating input:checked ~ label,
+.rating label:hover,
+.rating label:hover ~ label {
+    background: var(--warning);
+    color: white;
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(255, 193, 7, 0.3);
+}
+
+/* ---------- Breadcrumb ---------- */
+.breadcrumb-custom {
+    background: transparent;
+    padding: 0;
+    margin-bottom: 1.5rem;
+    font-size: 0.85rem;
+}
+.breadcrumb-custom .breadcrumb-item a {
+    color: var(--cobalt);
+    text-decoration: none;
+}
+.breadcrumb-custom .breadcrumb-item.active { color: var(--slate); }
+
+/* ---------- Result / Forecast boxes ---------- */
+.result-box {
+    background-color: rgba(130, 200, 229, 0.1);
+    border: 1px dashed var(--cobalt);
+    border-radius: 8px;
+    padding: 24px;
+    display: none;
+}
+.loading { display: none; text-align: center; color: var(--slate); }
+
+/* ---------- Empty state ---------- */
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+}
+.empty-state i { font-size: 3rem; color: var(--slate); margin-bottom: 1rem; display: block; }
+
+/* ---------- Toast notifications ---------- */
+.toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; }

@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Load Forecasting Dashboard', 'forecast', ~{::content})}">
+<th:block th:fragment="content">
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb breadcrumb-custom">
+        <li class="breadcrumb-item"><a th:href="@{/home}"><i class="fas fa-home me-1"></i>Home</a></li>
+        <li class="breadcrumb-item active">Load Forecasting Dashboard</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">
+            <i class="fas fa-bolt me-2" style="color:var(--cobalt);"></i>Load Forecasting Dashboard
+        </h2>
+        <p class="text-muted mb-0">Predict electricity demand and view historical patterns</p>
+        <div class="d-flex gap-2 mt-3 flex-wrap">
+            <a th:href="@{/home}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+                <i class="fas fa-bolt me-1"></i>Quick Prediction
+            </a>
+            <a th:href="@{/forecast/dashboard}" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold">
+                <i class="fas fa-chart-line me-1"></i>Forecast Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<div id="alertBox" class="alert alert-dismissible fade show border-0 shadow-sm mb-4" style="display:none;" role="alert">
+    <i id="alertIcon" class="me-2"></i>
+    <span id="alertText"></span>
+    <button type="button" class="btn-close" onclick="hideAlert()"></button>
+</div>
+
+<div class="row g-4">
+
+    <div class="col-lg-5">
+        <div class="ui-card h-100">
+            <div class="card-header-custom px-4 py-3">
+                <h5 class="mb-0 fw-bold">
+                    <i class="fas fa-search me-2" style="color:var(--cobalt);"></i>Single Load Prediction
+                </h5>
+            </div>
+            <div class="p-4">
+                <div class="mb-3">
+                    <label class="form-label">Target Timestamp <span class="text-danger">*</span></label>
+                    <input type="datetime-local" id="timestamp" class="form-control">
+                    <div class="invalid-feedback" id="ts-error"></div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label class="form-label">Temperature (&deg;C) <span class="text-danger">*</span></label>
+                        <input type="number" id="temperature" class="form-control"
+                               placeholder="e.g. 28.5" step="0.1" min="10" max="45">
+                        <div class="form-text">10&deg;C - 45&deg;C</div>
+                        <div class="invalid-feedback" id="temp-error"></div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Humidity (%) <span class="text-danger">*</span></label>
+                        <input type="number" id="humidity" class="form-control"
+                               placeholder="e.g. 75" step="0.1" min="0" max="100">
+                        <div class="form-text">0% - 100%</div>
+                        <div class="invalid-feedback" id="hum-error"></div>
+                    </div>
+                </div>
+                <div id="dashboardWeatherStatus" class="form-text mb-3" style="display:none;"></div>
+                <div class="mb-4">
+                    <label class="form-label">Public Event</label>
+                    <select id="public_event" class="form-select">
+                        <option value="0">No - Standard day</option>
+                        <option value="1">Yes - Holiday / Special event</option>
+                    </select>
+                </div>
+
+                <button id="predictLoadBtn" onclick="predictLoad()" class="btn-primary-custom w-100 py-2">
+                    <i class="fas fa-bolt me-2"></i>Predict Load
+                </button>
+
+                <div id="predictLoading" class="loading mt-3">
+                    <div class="spinner-border spinner-border-sm" style="color:var(--cobalt);" role="status"></div>
+                    <span class="ms-2 fw-semibold text-muted">Calculating prediction...</span>
+                </div>
+
+                <div id="predictionResult" class="result-box text-center mt-3">
+                    <h6 class="text-uppercase fw-bold mb-2"
+                        style="color:var(--slate); font-size:0.8rem; letter-spacing:1px;">Predicted Load</h6>
+                    <span id="predictionValue" class="display-5 fw-bold" style="color:var(--navy);">--</span>
+                    <span class="h5 text-muted"> MW</span>
+                    <div class="mt-3">
+                        <a id="dashboardGenerateMixLink" th:href="@{/generation-mix}"
+                           class="btn btn-sm btn-primary rounded-pill px-3 fw-bold" style="display:none;">
+                            <i class="fas fa-industry me-1"></i>Generate Mix
+                        </a>
+                    </div>
+                </div>
+
+                <div id="anomalyResult" class="alert alert-warning border-0 shadow-sm mt-3" style="display:none;">
+                    <div class="d-flex align-items-start">
+                        <i class="fas fa-exclamation-triangle fs-5 me-3 mt-1"></i>
+                        <div>
+                            <div class="fw-bold mb-1">LOF anomaly check flagged this prediction</div>
+                            <div id="anomalyReason" class="small mb-2">--</div>
+                            <div class="small">
+                                <strong>Severity:</strong> <span id="anomalySeverityValue">--</span>
+                                <span class="mx-2">|</span>
+                                <strong>Confidence:</strong> <span id="anomalyConfidenceValue">--</span>
+                                <span class="mx-2">|</span>
+                                <strong>Model:</strong> <span id="anomalyModelValue">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="ui-card h-100">
+            <div class="card-header-custom px-4 py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold">
+                    <i class="fas fa-chart-area me-2" style="color:var(--cobalt);"></i>24-Hour Forecast
+                </h5>
+                <div class="d-flex gap-2">
+                    <button id="generateForecastBtn" onclick="forecastChart()"
+                            class="btn btn-sm btn-outline-primary rounded-pill fw-bold px-3">
+                        <i class="fas fa-sync-alt me-1"></i>Generate
+                    </button>
+                    <button id="saveEnergyBtn" onclick="saveEnergy()"
+                            class="btn btn-sm btn-outline-secondary rounded-pill fw-bold px-3">
+                        <i class="fas fa-save me-1"></i>Save Energy
+                    </button>
+                </div>
+            </div>
+            <div class="p-4">
+                <div id="forecastLoading" class="loading text-center py-3">
+                    <div class="spinner-border spinner-border-sm" style="color:var(--cobalt);" role="status"></div>
+                    <span class="ms-2 fw-semibold text-muted">Generating forecast...</span>
+                </div>
+
+                <canvas id="forecastCanvas" style="max-height:220px;"></canvas>
+
+                <div id="forecastSummary" style="display:none;">
+                    <div class="row g-3 mt-3">
+                        <div class="col-6 col-md-3">
+                            <div class="p-3 rounded text-center" style="background:rgba(0,71,171,0.05);">
+                                <div class="small text-muted mb-1">Peak Load</div>
+                                <div class="fw-bold" id="peakLoad" style="color:var(--navy);">--</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="p-3 rounded text-center" style="background:rgba(0,71,171,0.05);">
+                                <div class="small text-muted mb-1">Low Load</div>
+                                <div class="fw-bold" id="lowLoad" style="color:var(--navy);">--</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="p-3 rounded text-center" style="background:rgba(0,71,171,0.05);">
+                                <div class="small text-muted mb-1">Average</div>
+                                <div class="fw-bold" id="avgLoad" style="color:var(--navy);">--</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="p-3 rounded text-center" style="background:rgba(0,71,171,0.05);">
+                                <div class="small text-muted mb-1">Total Energy</div>
+                                <div class="fw-bold" id="totalEnergy" style="color:var(--navy);">--</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="forecastEmpty" class="empty-state py-4">
+                    <i class="fas fa-chart-line"></i>
+                    <p class="text-muted">Click Generate to create a 24-hour forecast</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="ui-card mt-4">
+    <div class="card-header-custom px-4 py-3 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold">
+            <i class="fas fa-history me-2" style="color:var(--cobalt);"></i>Prediction History
+        </h5>
+        <button id="refreshHistoryBtn" onclick="loadHistory(true)"
+                class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold">
+            <i class="fas fa-sync-alt me-1"></i>Refresh
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>#</th>
+                    <th>Timestamp</th>
+                    <th>Temp (&deg;C)</th>
+                    <th>Humidity (%)</th>
+                    <th>Event</th>
+                    <th>Predicted Load</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="historyBody">
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Loading history...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const API = '/api/load';
+    let chartInstance = null;
+    let latestTotalEnergy = 0;
+    let predictionDate = '';
+    let currentPredictionId = null;
+    let dashboardWeatherRequestId = 0;
+
+    function showAlert(type, message) {
+        const box = document.getElementById('alertBox');
+        const icon = document.getElementById('alertIcon');
+        const text = document.getElementById('alertText');
+        box.className = 'alert alert-' + (type === 'success' ? 'success' : 'danger') +
+                        ' alert-dismissible fade show border-0 shadow-sm mb-4';
+        icon.className = 'fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-circle') + ' me-2';
+        text.textContent = message;
+        box.style.display = 'block';
+        setTimeout(() => { box.style.display = 'none'; }, 5000);
+    }
+
+    function hideAlert() {
+        document.getElementById('alertBox').style.display = 'none';
+    }
+
+    function setActionButtonState(button, isBusy, busyHtml) {
+        if (!button) {
+            return;
+        }
+        if (!button.dataset.originalHtml) {
+            button.dataset.originalHtml = button.innerHTML;
+        }
+        button.disabled = isBusy;
+        button.innerHTML = isBusy ? busyHtml : button.dataset.originalHtml;
+    }
+
+    function setDashboardWeatherInputsBusy(isBusy) {
+        document.getElementById('temperature').disabled = isBusy;
+        document.getElementById('humidity').disabled = isBusy;
+    }
+
+    function setDashboardWeatherStatus(type, message) {
+        const status = document.getElementById('dashboardWeatherStatus');
+        status.style.display = message ? 'block' : 'none';
+        status.className = 'form-text mb-3';
+        if (!message) {
+            status.textContent = '';
+            return;
+        }
+        if (type === 'success') {
+            status.classList.add('text-success');
+        } else if (type === 'warning') {
+            status.classList.add('text-warning');
+        } else {
+            status.classList.add('text-muted');
+        }
+        status.textContent = message;
+    }
+
+    async function fetchDashboardWeather() {
+        const rawTimestamp = document.getElementById('timestamp').value;
+
+        if (!rawTimestamp) {
+            setDashboardWeatherInputsBusy(false);
+            setDashboardWeatherStatus('', '');
+            return;
+        }
+
+        const requestId = ++dashboardWeatherRequestId;
+        const timestamp = rawTimestamp.length === 16 ? `${rawTimestamp}:00` : rawTimestamp;
+
+        setDashboardWeatherInputsBusy(true);
+        setDashboardWeatherStatus('info', 'Fetching predicted weather...');
+
+        try {
+            const response = await fetch('/api/weather/predict-transient', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ timestamp })
+            });
+
+            const data = await response.json();
+
+            if (requestId !== dashboardWeatherRequestId) {
+                return;
+            }
+
+            if (!response.ok || data.error) {
+                throw new Error(data.error || 'Weather service unavailable.');
+            }
+
+            if (data.source === 'python_model') {
+                document.getElementById('temperature').value = Number(data.temperature).toFixed(1);
+                document.getElementById('humidity').value = Number(data.humidity).toFixed(1);
+                setDashboardWeatherStatus('success', 'Weather auto-filled from prediction. You can still edit these values.');
+            } else {
+                setDashboardWeatherStatus('warning', 'Weather service unavailable. Enter values manually.');
+            }
+        } catch (error) {
+            if (requestId !== dashboardWeatherRequestId) {
+                return;
+            }
+            setDashboardWeatherStatus('warning', 'Weather service unavailable. Enter values manually.');
+        } finally {
+            if (requestId === dashboardWeatherRequestId) {
+                setDashboardWeatherInputsBusy(false);
+            }
+        }
+    }
+
+    document.getElementById('timestamp').addEventListener('change', fetchDashboardWeather);
+
+    function validateInputs(timestamp, temp, hum, event) {
+        let valid = true;
+
+        ['timestamp', 'temperature', 'humidity'].forEach(id => {
+            document.getElementById(id).classList.remove('is-invalid');
+        });
+
+        if (!timestamp) {
+            document.getElementById('timestamp').classList.add('is-invalid');
+            document.getElementById('ts-error').textContent = 'Please select a date and time';
+            valid = false;
+        }
+        if (isNaN(temp) || temp < 10 || temp > 45) {
+            document.getElementById('temperature').classList.add('is-invalid');
+            document.getElementById('temp-error').textContent = 'Temperature must be between 10°C and 45°C';
+            valid = false;
+        }
+        if (isNaN(hum) || hum < 0 || hum > 100) {
+            document.getElementById('humidity').classList.add('is-invalid');
+            document.getElementById('hum-error').textContent = 'Humidity must be between 0% and 100%';
+            valid = false;
+        }
+        if (!(event === 0 || event === 1)) {
+            showAlert('error', 'Public event must be 0 or 1');
+            valid = false;
+        }
+        return valid;
+    }
+
+    async function predictLoad() {
+        const predictBtn = document.getElementById('predictLoadBtn');
+        const generateMixLink = document.getElementById('dashboardGenerateMixLink');
+
+        let timestamp = document.getElementById('timestamp').value;
+        if (timestamp.length === 16) {
+            timestamp += ':00';
+        }
+        const temp = parseFloat(document.getElementById('temperature').value);
+        const hum = parseFloat(document.getElementById('humidity').value);
+        const event = parseInt(document.getElementById('public_event').value);
+
+        if (!validateInputs(timestamp, temp, hum, event)) {
+            return;
+        }
+
+        predictionDate = timestamp.split('T')[0];
+        currentPredictionId = null;
+
+        document.getElementById('predictLoading').style.display = 'block';
+        document.getElementById('predictionResult').style.display = 'none';
+        document.getElementById('anomalyResult').style.display = 'none';
+        generateMixLink.style.display = 'none';
+        generateMixLink.href = '/generation-mix';
+        setActionButtonState(predictBtn, true, '<span class="spinner-border spinner-border-sm me-2"></span>Predicting...');
+
+        try {
+            const res = await fetch('/api/forecast', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    timestamp: timestamp,
+                    temperature: temp,
+                    humidity: hum,
+                    publicEvent: event
+                })
+            });
+
+            const result = await res.json();
+
+            if (!res.ok || result.error) {
+                showAlert('error', result.error || 'Prediction failed.');
+                return;
+            }
+
+            const load = result.load_demand || result;
+            document.getElementById('predictionValue').textContent =
+                (typeof load === 'number' ? load.toFixed(2) : load);
+            document.getElementById('predictionResult').style.display = 'block';
+            currentPredictionId = result.id || null;
+            if (currentPredictionId) {
+                generateMixLink.href = `/generation-mix?predictionId=${currentPredictionId}`;
+                generateMixLink.style.display = 'inline-flex';
+            }
+            if (result.is_anomaly) {
+                document.getElementById('anomalyReason').textContent =
+                    result.reason || 'This prediction deviates from the learned historical pattern for the same operating context.';
+                document.getElementById('anomalySeverityValue').textContent = result.severity || 'MEDIUM';
+                document.getElementById('anomalyConfidenceValue').textContent =
+                    result.confidence ? ((result.confidence * 100).toFixed(1) + '%') : 'N/A';
+                document.getElementById('anomalyModelValue').textContent =
+                    (result.model_name || result.source || 'local_outlier_factor').replaceAll('_', ' ');
+                document.getElementById('anomalyResult').style.display = 'block';
+                showAlert('error', `Prediction generated. ${result.severity || 'Anomaly'} anomaly detected by ${(result.model_name || 'local_outlier_factor').replaceAll('_', ' ')}.`);
+            } else {
+                showAlert('success', 'Prediction generated. LOF anomaly check returned a normal pattern.');
+            }
+            await loadHistory();
+
+        } catch (e) {
+            showAlert('error', 'Connection error. Please ensure the server is running.');
+        } finally {
+            document.getElementById('predictLoading').style.display = 'none';
+            setActionButtonState(predictBtn, false);
+        }
+    }
+
+    async function forecastChart() {
+        const generateBtn = document.getElementById('generateForecastBtn');
+        document.getElementById('forecastLoading').style.display = 'block';
+        document.getElementById('forecastEmpty').style.display = 'none';
+        document.getElementById('forecastSummary').style.display = 'none';
+        setActionButtonState(generateBtn, true, '<span class="spinner-border spinner-border-sm me-1"></span>Generating...');
+
+        try {
+            const historyRes = await fetch(API + '/history');
+            const history = await historyRes.json();
+
+            if (!history || !history.length) {
+                showAlert('error', 'No prediction history available. Make a prediction first.');
+                document.getElementById('forecastEmpty').style.display = 'block';
+                return;
+            }
+
+            const lastTimestamp = history[0].timestamp;
+            const sequence = history.slice(0, 24).map(row => [
+                row.temperature, row.humidity, row.public_event
+            ]);
+
+            const res = await fetch(API + '/forecast-chart', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ lastTimestamp: lastTimestamp, sequence: sequence })
+            });
+
+            const data = await res.json();
+
+            if (data.error) {
+                showAlert('error', data.error);
+                document.getElementById('forecastEmpty').style.display = 'block';
+                return;
+            }
+
+            const forecast = data.forecast;
+            latestTotalEnergy = parseFloat(
+                forecast.reduce((sum, v) => sum + (Number(v) * 0.25), 0).toFixed(2)
+            );
+
+            const ctx = document.getElementById('forecastCanvas').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Predicted Load (MW)',
+                        data: forecast,
+                        borderColor: '#0047AB',
+                        backgroundColor: 'rgba(0,71,171,0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: false, grid: { borderDash: [5,5] } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            document.getElementById('peakLoad').textContent =
+                data.peak.value.toFixed(2) + ' MW at ' + data.peak.hour;
+            document.getElementById('lowLoad').textContent =
+                data.low.value.toFixed(2) + ' MW at ' + data.low.hour;
+            document.getElementById('avgLoad').textContent =
+                data.average.toFixed(2) + ' MW';
+            document.getElementById('totalEnergy').textContent =
+                latestTotalEnergy.toFixed(2) + ' kWh';
+
+            document.getElementById('forecastSummary').style.display = 'block';
+            showAlert('success', '24-hour forecast generated successfully.');
+
+        } catch (e) {
+            showAlert('error', 'Could not generate forecast. Ensure the prediction service is running.');
+            document.getElementById('forecastEmpty').style.display = 'block';
+        } finally {
+            document.getElementById('forecastLoading').style.display = 'none';
+            setActionButtonState(generateBtn, false);
+        }
+    }
+
+    async function saveEnergy() {
+        const saveBtn = document.getElementById('saveEnergyBtn');
+        if (!predictionDate) {
+            showAlert('error', 'Please make a prediction first before saving energy.');
+            return;
+        }
+        if (!latestTotalEnergy || isNaN(latestTotalEnergy)) {
+            showAlert('error', 'Please generate the forecast first.');
+            return;
+        }
+        setActionButtonState(saveBtn, true, '<span class="spinner-border spinner-border-sm me-1"></span>Saving...');
+        try {
+            const res = await fetch(API + '/save-daily-energy', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ date: predictionDate, total_energy: latestTotalEnergy })
+            });
+            const result = await res.json();
+            if (!res.ok || result.error) {
+                showAlert('error', result.error || 'Saving energy failed.');
+                return;
+            }
+            showAlert('success', result.message || 'Energy saved successfully.');
+        } catch (e) {
+            showAlert('error', 'Saving energy failed.');
+        } finally {
+            setActionButtonState(saveBtn, false);
+        }
+    }
+
+    async function loadHistory(showSuccess = false) {
+        const refreshBtn = document.getElementById('refreshHistoryBtn');
+        if (showSuccess) {
+            setActionButtonState(refreshBtn, true, '<span class="spinner-border spinner-border-sm me-1"></span>Refreshing...');
+        }
+        try {
+            const res = await fetch(API + '/history');
+            const data = await res.json();
+            const tbody = document.getElementById('historyBody');
+
+            if (!res.ok || data.error) {
+                throw new Error(data.error || 'Could not load history.');
+            }
+
+            if (!data || !data.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">' +
+                    '<i class="fas fa-inbox me-2"></i>No predictions yet.</td></tr>';
+                if (showSuccess) {
+                    showAlert('success', 'History refreshed.');
+                }
+                return;
+            }
+
+            tbody.innerHTML = data.map(row => `
+                <tr>
+                    <td class="fw-bold text-muted small">${row.id}</td>
+                    <td class="small">${row.timestamp}<input type="hidden" id="ts-${row.id}" value="${row.timestamp}"></td>
+                    <td>
+                        <input value="${row.temperature}" id="temp-${row.id}"
+                               class="form-control form-control-sm" style="width:80px;">
+                    </td>
+                    <td>
+                        <input value="${row.humidity}" id="hum-${row.id}"
+                               class="form-control form-control-sm" style="width:80px;">
+                    </td>
+                    <td>
+                        <input value="${row.public_event}" id="event-${row.id}"
+                               class="form-control form-control-sm" style="width:60px;">
+                    </td>
+                    <td class="fw-bold">
+                        ${row.predicted_load ? row.predicted_load.toFixed(2) + ' MW' : 'N/A'}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button onclick="updateRow(this, ${row.id})"
+                                    class="btn btn-sm btn-outline-primary rounded-pill px-2 fw-bold">
+                                <i class="fas fa-edit me-1"></i>Update
+                            </button>
+                            <button onclick="deleteRow(this, ${row.id})"
+                                    class="btn btn-sm btn-outline-danger rounded-pill px-2 fw-bold">
+                                <i class="fas fa-trash-alt me-1"></i>Delete
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+
+            if (showSuccess) {
+                showAlert('success', 'History refreshed.');
+            }
+
+        } catch (e) {
+            document.getElementById('historyBody').innerHTML =
+                '<tr><td colspan="7" class="text-center py-4 text-danger">' +
+                '<i class="fas fa-exclamation-circle me-2"></i>Could not load history.</td></tr>';
+            if (showSuccess) {
+                showAlert('error', e.message || 'History refresh failed.');
+            }
+        } finally {
+            if (showSuccess) {
+                setActionButtonState(refreshBtn, false);
+            }
+        }
+    }
+
+    async function updateRow(button, id) {
+        const data = {
+            timestamp: document.getElementById('ts-' + id).value,
+            temperature: parseFloat(document.getElementById('temp-' + id).value),
+            humidity: parseFloat(document.getElementById('hum-' + id).value),
+            publicEvent: parseInt(document.getElementById('event-' + id).value)
+        };
+        setActionButtonState(button, true, '<span class="spinner-border spinner-border-sm me-1"></span>Updating...');
+        try {
+            const response = await fetch(API + '/update/' + id, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || ('Update failed for record #' + id + '.'));
+            }
+            showAlert('success', 'Record #' + id + ' updated successfully.');
+            await loadHistory();
+        } catch (e) {
+            showAlert('error', e.message || 'Update failed.');
+            setActionButtonState(button, false);
+        }
+    }
+
+    async function deleteRow(button, id) {
+        if (!confirm('Delete prediction record #' + id + '? This cannot be undone.')) return;
+        setActionButtonState(button, true, '<span class="spinner-border spinner-border-sm me-1"></span>Deleting...');
+        try {
+            const response = await fetch(API + '/delete/' + id, { method: 'DELETE' });
+            if (!response.ok) {
+                throw new Error('Delete failed for record #' + id + '.');
+            }
+            showAlert('success', 'Record #' + id + ' deleted successfully.');
+            await loadHistory();
+        } catch (e) {
+            showAlert('error', e.message || 'Delete failed.');
+            setActionButtonState(button, false);
+        }
+    }
+
+    window.onload = () => loadHistory();
+</script>
+
+</th:block>
+</html>
+
+

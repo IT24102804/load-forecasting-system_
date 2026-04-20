@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Anomaly List', 'anomaly', ~{::content})}">
+<th:block th:fragment="content">
+
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb breadcrumb-custom">
+        <li class="breadcrumb-item"><a th:href="@{/home}"><i class="fas fa-home me-1"></i>Home</a></li>
+        <li class="breadcrumb-item"><a th:href="@{/anomaly}">Anomaly Detection</a></li>
+        <li class="breadcrumb-item active">All Anomalies</li>
+    </ol>
+</nav>
+
+<!-- Header + Filter Bar -->
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3">
+    <div>
+        <h2 class="fw-bold mb-1"><i class="fas fa-list me-2" style="color:var(--cobalt);"></i>All Anomalies</h2>
+        <p class="text-muted mb-0">
+            Showing <strong th:text="${totalCount}">0</strong> record(s)
+            <span th:if="${filterSeverity}" class="ms-1">— filtered by severity: <span class="badge bg-secondary" th:text="${filterSeverity}"></span></span>
+            <span th:if="${filterStatus}"   class="ms-1">— filtered by status: <span class="badge bg-secondary" th:text="${filterStatus}"></span></span>
+        </p>
+    </div>
+    <a th:href="@{/anomaly}" class="btn btn-outline-secondary rounded-pill px-3">
+        <i class="fas fa-chart-bar me-1"></i>Back to Dashboard
+    </a>
+</div>
+
+<!-- Filter Buttons -->
+<div class="d-flex flex-wrap gap-2 mb-4">
+    <a th:href="@{/anomaly/list}" class="btn btn-sm rounded-pill"
+       th:classappend="${filterSeverity == null and filterStatus == null} ? 'btn-dark' : 'btn-outline-secondary'">
+        All
+    </a>
+    <a th:href="@{/anomaly/list(severity='HIGH')}" class="btn btn-sm rounded-pill"
+       th:classappend="${filterSeverity == 'HIGH'} ? 'btn-danger' : 'btn-outline-danger'">
+        <i class="fas fa-circle me-1" style="font-size:0.6rem;"></i>High Severity
+    </a>
+    <a th:href="@{/anomaly/list(severity='MEDIUM')}" class="btn btn-sm rounded-pill"
+       th:classappend="${filterSeverity == 'MEDIUM'} ? 'btn-warning text-dark' : 'btn-outline-warning'">
+        <i class="fas fa-circle me-1" style="font-size:0.6rem;"></i>Medium
+    </a>
+    <a th:href="@{/anomaly/list(severity='LOW')}" class="btn btn-sm rounded-pill"
+       th:classappend="${filterSeverity == 'LOW'} ? 'btn-success' : 'btn-outline-success'">
+        <i class="fas fa-circle me-1" style="font-size:0.6rem;"></i>Low
+    </a>
+    <div class="ms-3 border-start ps-3 d-flex gap-2">
+        <a th:href="@{/anomaly/list(status='OPEN')}" class="btn btn-sm rounded-pill"
+           th:classappend="${filterStatus == 'OPEN'} ? 'btn-danger' : 'btn-outline-secondary'">
+            Open
+        </a>
+        <a th:href="@{/anomaly/list(status='ACKNOWLEDGED')}" class="btn btn-sm rounded-pill"
+           th:classappend="${filterStatus == 'ACKNOWLEDGED'} ? 'btn-info' : 'btn-outline-secondary'">
+            Acknowledged
+        </a>
+        <a th:href="@{/anomaly/list(status='RESOLVED')}" class="btn btn-sm rounded-pill"
+           th:classappend="${filterStatus == 'RESOLVED'} ? 'btn-success' : 'btn-outline-secondary'">
+            Resolved
+        </a>
+    </div>
+</div>
+
+<!-- Results -->
+<div class="ui-card">
+
+    <!-- Has records -->
+    <div th:if="${anomalies != null and !anomalies.isEmpty()}">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:60px;">#</th>
+                        <th>Detected At</th>
+                        <th>Load (MW)</th>
+                        <th>Temp (°C)</th>
+                        <th>Hour</th>
+                        <th>Score</th>
+                        <th>Confidence</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                        <th>Reason (summary)</th>
+                        <th style="width:100px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="a : ${anomalies}"
+                        th:classappend="${'anomaly-row-' + a.severity.toLowerCase()}">
+                        <td class="fw-bold text-muted small" th:text="${a.id}">1</td>
+                        <td class="small" th:text="${a.formattedDate}">date</td>
+                        <td class="fw-bold" th:text="${#numbers.formatDecimal(a.loadDemand, 1, 2)}">-</td>
+                        <td th:text="${#numbers.formatDecimal(a.temperature, 1, 1)}">-</td>
+                        <td th:text="${a.hourOfDay + ':00'}">0:00</td>
+                        <td>
+                            <div class="d-flex align-items-center gap-1">
+                                <small class="fw-semibold" th:text="${#numbers.formatDecimal(a.anomalyScore, 1, 2)}">0.00</small>
+                            </div>
+                        </td>
+                        <td>
+                            <small class="fw-semibold"
+                                   th:text="${a.confidence != null ? #numbers.formatDecimal(a.confidence * 100, 1, 1) + '%' : 'N/A'}">0.0%</small>
+                        </td>
+                        <td>
+                            <span class="badge rounded-pill px-3" th:classappend="${a.severityBadgeClass}" th:text="${a.severity}">-</span>
+                        </td>
+                        <td>
+                            <span class="badge rounded-pill px-2" th:classappend="${a.statusBadgeClass}" th:text="${a.status}">-</span>
+                        </td>
+                        <td class="small text-muted" style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                            th:text="${a.reason}">-</td>
+                        <td>
+                            <a th:href="@{/anomaly/{id}(id=${a.id})}"
+                               class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+                                <i class="fas fa-eye me-1"></i>View
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Empty state -->
+    <div th:if="${anomalies == null or anomalies.isEmpty()}" class="empty-state p-5">
+        <i class="fas fa-filter" style="font-size:3rem; color:var(--slate); display:block; margin-bottom:1rem;"></i>
+        <h5 class="fw-bold">No records match your filter</h5>
+        <p class="text-muted">Try a different severity or status filter, or generate forecasts to trigger detection.</p>
+        <a th:href="@{/anomaly/list}" class="btn-outline-custom mt-2">Clear Filters</a>
+    </div>
+
+</div>
+
+</th:block>
+</html>

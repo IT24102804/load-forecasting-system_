@@ -105,7 +105,7 @@ public class LoadDataController {
     @DeleteMapping("/delete-old")
     public String deleteOldData(@RequestParam String cutoffDate) {
         try {
-            loadDataRepository.deleteOldData(cutoffDate);
+            loadDataRepository.deleteOldData(java.time.LocalDateTime.parse(cutoffDate));
             return "Outdated data deleted successfully!";
         } catch (Exception e) {
             return "Error: " + e.getMessage();
