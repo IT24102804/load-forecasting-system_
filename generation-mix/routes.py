@@ -25,6 +25,22 @@ FEATURES = [
     "season_encoded",
 ]
 
+# Training data ranges - for out of distribution check
+TRAINING_RANGES = {
+    "load_demand": {"min": 26799, "max": 47444},
+    "reservoir_pct": {"min": 38.3, "max": 99.7},
+    "wind_lag1": {"min": 500, "max": 3000},
+    "solar_lag1": {"min": 300, "max": 2000},
+    "mini_hydro_lag1": {"min": 800, "max": 4000},
+}
+
+# Expected prediction ranges
+PREDICTION_RANGES = {
+    "major_hydro": {"min": 0, "max": 35000},
+    "total_coal": {"min": 0, "max": 25000},
+    "total_thermal": {"min": 0, "max": 15000},
+}
+
 MONTHLY_WIND = {
     1: 1200, 2: 1100, 3: 1000, 4: 900,
     5: 1500, 6: 1800, 7: 1900, 8: 1850,
@@ -52,6 +68,10 @@ def get_season(month):
     return 2
 
 
+def _error(message, status_code=400):
+    return jsonify({"error": message}), status_code
+
+
 def estimate_renewable(month, day, reservoir_pct):
     np.random.seed(month * 100 + day)
 
@@ -76,9 +96,55 @@ def estimate_renewable(month, day, reservoir_pct):
 
 
 def load_model():
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError("generation_model.pkl not found. Please train the model first.")
+    if not os.path.exists(SCALER_PATH):
+        raise FileNotFoundError("generation_scaler.pkl not found. Please train the model first.")
+
     model = joblib.load(MODEL_PATH)
     scaler = joblib.load(SCALER_PATH)
+    if model is None or scaler is None:
+        raise ValueError("Model artifacts failed to load.")
     return model, scaler
+
+
+def check_out_of_distribution(row):
+    warnings = []
+    for feature, ranges in TRAINING_RANGES.items():
+        if feature in row:
+            val = row[feature]
+            if val < ranges["min"] or val > ranges["max"]:
+                warnings.append(
+                    f"{feature} value {val} is outside training range ({ranges['min']} - {ranges['max']})"
+                )
+    return warnings
+
+
+def check_prediction_sanity(major_hydro, total_coal, total_thermal, load_demand):
+    warnings = []
+
+    if major_hydro < 0:
+        warnings.append("Major hydro prediction is negative!")
+    if total_coal < 0:
+        warnings.append("Coal prediction is negative!")
+    if total_thermal < 0:
+        warnings.append("Thermal prediction is negative!")
+
+    for name, val, ranges in [
+        ("major_hydro", major_hydro, PREDICTION_RANGES["major_hydro"]),
+        ("total_coal", total_coal, PREDICTION_RANGES["total_coal"]),
+        ("total_thermal", total_thermal, PREDICTION_RANGES["total_thermal"]),
+    ]:
+        if val > ranges["max"]:
+            warnings.append(f"{name} prediction {val} MWh seems unrealistically high!")
+
+    total_predicted = major_hydro + total_coal + total_thermal
+    if load_demand > 0 and total_predicted > load_demand * 1.5:
+        warnings.append("Total predicted generation is much higher than load demand!")
+    if load_demand > 0 and total_predicted < load_demand * 0.1:
+        warnings.append("Total predicted generation seems too low for the load demand!")
+
+    return warnings
 
 
 @generation_bp.route("/")
@@ -89,21 +155,51 @@ def home():
     })
 
 
+@generation_bp.route("/health", methods=["GET"])
+def health_check():
+    try:
+        model, scaler = load_model()
+        return jsonify({
+            "status": "healthy",
+            "model_loaded": model is not None,
+            "scaler_loaded": scaler is not None,
+            "model_features": len(FEATURES),
+            "message": "Generation Mix API is running!",
+        })
+    except Exception:
+        return jsonify({
+            "status": "unhealthy",
+            "error": "Generation Mix model is not ready.",
+        }), 500
+
+
 @generation_bp.route("/predict", methods=["POST"])
 def predict():
     try:
         data = request.get_json(silent=True)
         if not data:
-            return jsonify({"error": "No data sent!"}), 400
+            return _error("No data sent!", 400)
 
-        target_date = pd.to_datetime(data.get("date"))
-        reservoir_pct = float(data.get("reservoir_pct", 0))
-        load_demand = float(data.get("load_demand", 37000))
+        if not data.get("date"):
+            return _error("Date is required!", 400)
+        if data.get("reservoir_pct") is None:
+            return _error("Reservoir level is required!", 400)
+        if data.get("load_demand") is None:
+            return _error("Load demand is required!", 400)
+
+        target_date = pd.to_datetime(data.get("date"), errors="coerce")
+        if pd.isna(target_date):
+            return _error("Invalid date format. Use YYYY-MM-DD.", 400)
+
+        reservoir_pct = float(data.get("reservoir_pct"))
+        load_demand = float(data.get("load_demand"))
 
         if not 0 <= reservoir_pct <= 100:
-            return jsonify({"error": "Reservoir must be between 0 and 100"}), 400
+            return _error("Reservoir must be between 0 and 100!", 400)
         if load_demand < 20000:
-            return jsonify({"error": "Load Demand must be at least 20000 MWh!"}), 400
+            return _error("Load Demand must be at least 20,000 MWh!", 400)
+        if load_demand > 60000:
+            return _error("Load Demand cannot exceed 60,000 MWh!", 400)
 
         ts = pd.Timestamp(target_date)
         month = ts.month
@@ -134,12 +230,25 @@ def predict():
             "season_encoded": get_season(ts.month),
         }
 
-        model, scaler = load_model()
+        ood_warnings = check_out_of_distribution(row)
+
         features_frame = pd.DataFrame([row])[FEATURES]
+        if features_frame.shape[1] != len(FEATURES):
+            return _error(f"Feature mismatch. Expected {len(FEATURES)} features.", 500)
+        if features_frame.isnull().any().any():
+            return _error("Input contains missing values. Please check your inputs.", 400)
+
+        model, scaler = load_model()
+        scaler_features = getattr(scaler, "n_features_in_", None)
+        if scaler_features is not None and scaler_features != len(FEATURES):
+            return _error(f"Scaler expects {scaler_features} features but got {len(FEATURES)}.", 500)
+
         prediction = np.clip(model.predict(scaler.transform(features_frame))[0], 0, None)
         major_hydro = round(float(prediction[0]), 2)
         total_coal = round(float(prediction[1]), 2)
         total_thermal = round(float(prediction[2]), 2)
+
+        sanity_warnings = check_prediction_sanity(major_hydro, total_coal, total_thermal, load_demand)
 
         total = major_hydro + total_coal + total_thermal + wind_lag1 + solar_lag1 + mini_hydro_lag1
         total = max(total, 1)
@@ -168,6 +277,12 @@ def predict():
                 "mini_hydro": round(mini_hydro_lag1 / total * 100, 1),
             },
             "total_mwh": round(total, 2),
+            "ml_warnings": ood_warnings + sanity_warnings,
+            "out_of_distribution": len(ood_warnings) > 0,
         })
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+    except FileNotFoundError:
+        return _error("Generation Mix model is not ready. Please train and deploy the model artifacts.", 500)
+    except ValueError:
+        return _error("Invalid numeric input. Please check your values.", 400)
+    except Exception:
+        return _error("Prediction failed due to an internal error.", 500)

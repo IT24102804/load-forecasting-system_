@@ -15,7 +15,7 @@
         <h2 class="fw-bold mb-1">
             <i class="fas fa-industry me-2" style="color:var(--cobalt);"></i>Generation Mix Prediction
         </h2>
-        <p class="text-muted mb-0">Use a saved forecast to estimate the daily generation mix for the selected date.</p>
+        <p class="text-muted mb-0">Use a saved forecast and the day’s reservoir reading to estimate the daily generation mix.</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
         <a th:href="@{/home}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
@@ -39,24 +39,91 @@
 </div>
 
 <div th:if="${selectedPrediction == null}" class="ui-card p-4 p-lg-5 text-center">
-    <div class="mx-auto" style="max-width:620px;">
-        <div class="rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
-             style="width:72px;height:72px;background:rgba(0,71,171,0.08);color:var(--cobalt);">
-            <i class="fas fa-link fa-2x"></i>
+    <div class="mx-auto" style="max-width:920px;">
+        <div th:if="${runs != null && !runs.isEmpty()}" class="text-start">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <div>
+                    <h4 class="fw-bold mb-1">Saved Daily Mix Entries</h4>
+                    <div class="text-muted small">View, update, or delete previously saved daily mix entries.</div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Run ID</th>
+                        <th>Prediction ID</th>
+                        <th>Timestamp</th>
+                        <th>Reservoir (%)</th>
+                        <th>Estimated Demand (MWh)</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="run : ${runs}">
+                        <td class="fw-semibold" th:text="${run.id}">--</td>
+                        <td>
+                            <a class="text-decoration-none" th:href="@{/generation-mix(predictionId=${run.loadRequestId})}"
+                               th:text="${run.loadRequestId}">--</a>
+                        </td>
+                        <td th:text="${run.forecastTimestamp}">--</td>
+                        <td th:text="${#numbers.formatDecimal(run.reservoirPct, 1, 2)}">--</td>
+                        <td th:text="${#numbers.formatDecimal(run.estimatedDailyDemandMwh, 1, 2)}">--</td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3"
+                                    th:attr="data-run-id=${run.id},data-prediction-id=${run.loadRequestId},data-reservoir=${run.reservoirPct}" onclick="viewSavedMix(this)">
+                                View
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3"
+                                    th:attr="data-run-id=${run.id}" onclick="deleteSavedMix(this)">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
         </div>
-        <h4 class="fw-bold mb-3">Forecast Required</h4>
-        <p class="text-muted mb-4" th:text="${pageInstruction}">
-            Generate a forecast first, then open Generation Mix from that prediction result.
-        </p>
-        <div class="d-flex justify-content-center gap-2 flex-wrap">
-            <a th:href="@{/home}" class="btn-primary-custom">
-                <i class="fas fa-bolt me-2"></i>Generate Forecast
-            </a>
-            <a th:href="@{/forecast/dashboard}" class="btn btn-outline-primary rounded-pill px-4 fw-bold">
-                <i class="fas fa-history me-1"></i>Open Forecast Dashboard
-            </a>
+
+        <div th:if="${runs == null || runs.isEmpty()}" class="mx-auto" style="max-width:620px;">
+            <div class="rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+                 style="width:72px;height:72px;background:rgba(0,71,171,0.08);color:var(--cobalt);">
+                <i class="fas fa-link fa-2x"></i>
+            </div>
+            <h4 class="fw-bold mb-3">Forecast Required</h4>
+            <p class="text-muted mb-4" th:text="${pageInstruction}">
+                Generate a forecast first, then open Generation Mix from that prediction result.
+            </p>
+            <div class="d-flex justify-content-center gap-2 flex-wrap">
+                <a th:href="@{/home}" class="btn-primary-custom">
+                    <i class="fas fa-bolt me-2"></i>Generate Forecast
+                </a>
+                <a th:href="@{/forecast/dashboard}" class="btn btn-outline-primary rounded-pill px-4 fw-bold">
+                    <i class="fas fa-history me-1"></i>Open Forecast Dashboard
+                </a>
+            </div>
+
+            <div class="row g-3 mt-4 text-start">
+                <div class="col-md-6">
+                    <div class="ui-card p-4 h-100">
+                        <h6 class="fw-bold mb-2">
+                            <i class="fas fa-list-check me-2" style="color:var(--cobalt);"></i>Steps
+                        </h6>
+                        <div class="text-muted small">
+                            1) Generate a forecast for today or a future date.
+                            <br>
+                            2) Open Generation Mix from the prediction result.
+                            <br>
+                            3) Enter the reservoir level (0 to 100) and generate the mix.
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+</div>
 </div>
 
 <div th:if="${selectedPrediction != null}" class="row g-4">
@@ -68,9 +135,13 @@
                 </h5>
             </div>
             <div class="p-4">
+                <a th:href="@{/generation-mix}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold mb-3">
+                    <i class="fas fa-arrow-left me-1"></i>Back to Saved Mixes
+                </a>
+
                 <div class="alert alert-info border-0 small">
                     <i class="fas fa-info-circle me-2"></i>
-                    The saved forecast load is reused automatically. Only the reservoir level is entered here.
+                    The saved forecast inputs are reused automatically. Enter the reservoir level for the date once, then update the saved entry only if that reading changes.
                 </div>
 
                 <div class="row g-3 mb-4">
@@ -84,7 +155,7 @@
                         <div class="p-3 rounded" style="background:rgba(0,71,171,0.05);">
                             <div class="small text-muted mb-1">Forecast Load</div>
                             <div class="fw-bold">
-                                <span th:text="${#numbers.formatDecimal(selectedPrediction.predictedLoad, 1, 2)}">--</span> kW
+                                <span th:text="${#numbers.formatDecimal(selectedPrediction.predictedLoad, 1, 2)}">--</span> MW
                             </div>
                         </div>
                     </div>
@@ -94,7 +165,7 @@
                             <div class="fw-bold">
                                 <span th:text="${#numbers.formatDecimal(estimatedDailyDemand, 1, 2)}">--</span> MWh
                             </div>
-                            <div class="small text-muted mt-1">Derived automatically from the saved forecast for the selected date.</div>
+                            <div class="small text-muted mt-1">Calculated by summing 24 hourly load predictions for the selected date.</div>
                         </div>
                     </div>
                 </div>
@@ -107,9 +178,10 @@
 
                 <div class="mb-4">
                     <label for="reservoirPct" class="form-label">Reservoir Level (%) <span class="text-danger">*</span></label>
-                    <input id="reservoirPct" type="number" class="form-control" min="0" max="100" step="0.1"
-                           value="75" placeholder="e.g. 75">
-                    <div class="form-text">Enter a value between 0 and 100.</div>
+                    <input id="reservoirPct" type="number" class="form-control" min="0" max="100" step="0.1" required
+                           th:value="${prefillReservoirPct != null ? prefillReservoirPct : 75}" placeholder="e.g. 75">
+                    <div id="reservoirPctError" class="invalid-feedback">Reservoir percentage must be between 0 and 100.</div>
+                    <div class="form-text">Enter one reservoir reading for the selected date. Valid range: 0 to 100.</div>
                 </div>
 
                 <button id="generateMixBtn" type="button" class="btn-primary-custom w-100 py-2">
@@ -175,7 +247,7 @@
                         <div class="col-md-4">
                             <div class="p-3 rounded" style="background:rgba(0,71,171,0.05);">
                                 <div class="small text-muted mb-1">Forecast Load Used</div>
-                                <div class="fw-bold"><span id="mixForecastLoad">--</span> kW</div>
+                                <div class="fw-bold"><span id="mixForecastLoad">--</span> MW</div>
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -260,8 +332,176 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script th:inline="javascript">
     const selectedPredictionId = /*[[${selectedPrediction != null ? selectedPrediction.id : null}]]*/ null;
+    const selectedRunId = /*[[${selectedRunId}]]*/ null;
+    const prefillReservoirPct = /*[[${prefillReservoirPct}]]*/ null;
     let mixPieChart = null;
     let mixBarChart = null;
+
+    function validateReservoirInput(reservoirInput, reservoirPctError) {
+        if (!reservoirInput) {
+            return false;
+        }
+
+        if (reservoirInput.validity.valueMissing) {
+            if (reservoirPctError) {
+                reservoirPctError.textContent = 'Reservoir level is required.';
+            }
+            return false;
+        }
+
+        if (reservoirInput.validity.badInput) {
+            if (reservoirPctError) {
+                reservoirPctError.textContent = 'Please enter a valid number.';
+            }
+            return false;
+        }
+
+        if (reservoirInput.validity.rangeUnderflow || reservoirInput.validity.rangeOverflow) {
+            if (reservoirPctError) {
+                reservoirPctError.textContent = 'Reservoir percentage must be between 0 and 100.';
+            }
+            return false;
+        }
+
+        return reservoirInput.checkValidity();
+    }
+
+    async function viewSavedMix(button) {
+        const runId = button?.dataset?.runId;
+        const predictionId = button?.dataset?.predictionId;
+        const reservoir = button?.dataset?.reservoir;
+        if (!runId || !predictionId) {
+            showMixAlert('error', 'Saved mix data is missing.');
+            return;
+        }
+        const params = new URLSearchParams({
+            predictionId: String(predictionId),
+            runId: String(runId)
+        });
+        if (reservoir != null) {
+            params.set('reservoirPct', String(reservoir));
+        }
+        window.location.href = `/generation-mix?${params.toString()}`;
+    }
+
+    async function deleteSavedMix(button) {
+        hideMixAlert();
+        const runId = button?.dataset?.runId;
+        if (!runId) {
+            showMixAlert('error', 'Saved mix id is missing.');
+            return;
+        }
+        if (!confirm(`Delete saved mix #${runId}?`)) {
+            return;
+        }
+        try {
+            const response = await fetch(`/api/generation-mix/runs/${runId}`, { method: 'DELETE' });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to delete saved mix.');
+            }
+            window.location.reload();
+        } catch (error) {
+            showMixAlert('error', error.message || 'Failed to delete saved mix.');
+        }
+    }
+
+    async function loadSelectedRunIfPresent() {
+        if (!selectedRunId) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/generation-mix/runs/${selectedRunId}`);
+            const run = await response.json();
+            if (!response.ok) {
+                throw new Error(run.error || 'Failed to load saved mix.');
+            }
+            const prediction = {
+                major_hydro: Number(run.majorHydroMwh ?? 0),
+                total_coal: Number(run.totalCoalMwh ?? 0),
+                total_thermal: Number(run.totalThermalMwh ?? 0),
+                wind: Number(run.windMwh ?? 0),
+                solar: Number(run.solarMwh ?? 0),
+                mini_hydro: Number(run.miniHydroMwh ?? 0)
+            };
+            const total =
+                prediction.major_hydro +
+                prediction.total_coal +
+                prediction.total_thermal +
+                prediction.wind +
+                prediction.solar +
+                prediction.mini_hydro;
+
+            const denom = total > 0 ? total : 1;
+            const percentages = {
+                major_hydro: (prediction.major_hydro / denom * 100),
+                total_coal: (prediction.total_coal / denom * 100),
+                total_thermal: (prediction.total_thermal / denom * 100),
+                wind: (prediction.wind / denom * 100),
+                solar: (prediction.solar / denom * 100),
+                mini_hydro: (prediction.mini_hydro / denom * 100)
+            };
+
+            renderMixResult({
+                forecast_load: null,
+                estimated_load_demand: run.estimatedDailyDemandMwh,
+                reservoir_pct: run.reservoirPct,
+                prediction,
+                percentages,
+                inputs_used: {
+                    wind_lag1: prediction.wind,
+                    solar_lag1: prediction.solar,
+                    mini_hydro_lag1: prediction.mini_hydro
+                },
+                total_mwh: total
+            });
+        } catch (error) {
+            showMixAlert('error', error.message || 'Failed to load saved mix.');
+        }
+    }
+
+    function buildPayloadFromRun(run) {
+        const prediction = {
+            major_hydro: Number(run?.majorHydroMwh ?? 0),
+            total_coal: Number(run?.totalCoalMwh ?? 0),
+            total_thermal: Number(run?.totalThermalMwh ?? 0),
+            wind: Number(run?.windMwh ?? 0),
+            solar: Number(run?.solarMwh ?? 0),
+            mini_hydro: Number(run?.miniHydroMwh ?? 0)
+        };
+        const total =
+            prediction.major_hydro +
+            prediction.total_coal +
+            prediction.total_thermal +
+            prediction.wind +
+            prediction.solar +
+            prediction.mini_hydro;
+
+        const denom = total > 0 ? total : 1;
+        const percentages = {
+            major_hydro: (prediction.major_hydro / denom * 100),
+            total_coal: (prediction.total_coal / denom * 100),
+            total_thermal: (prediction.total_thermal / denom * 100),
+            wind: (prediction.wind / denom * 100),
+            solar: (prediction.solar / denom * 100),
+            mini_hydro: (prediction.mini_hydro / denom * 100)
+        };
+
+        return {
+            forecast_load: null,
+            estimated_load_demand: run?.estimatedDailyDemandMwh,
+            reservoir_pct: run?.reservoirPct,
+            prediction,
+            percentages,
+            inputs_used: {
+                wind_lag1: prediction.wind,
+                solar_lag1: prediction.solar,
+                mini_hydro_lag1: prediction.mini_hydro
+            },
+            total_mwh: total
+        };
+    }
 
     function showMixAlert(type, message) {
         const box = document.getElementById('mixAlert');
@@ -403,10 +643,29 @@
         }
 
         const reservoirInput = document.getElementById('reservoirPct');
+        const reservoirPctError = document.getElementById('reservoirPctError');
+        if (reservoirInput) {
+            reservoirInput.classList.remove('is-invalid');
+        }
+        if (reservoirPctError) {
+            reservoirPctError.textContent = 'Reservoir percentage must be between 0 and 100.';
+        }
+        if (!validateReservoirInput(reservoirInput, reservoirPctError)) {
+            if (reservoirInput) {
+                reservoirInput.classList.add('is-invalid');
+                reservoirInput.focus();
+            }
+            showMixAlert('error', reservoirPctError?.textContent || 'Please enter a valid reservoir percentage (0 - 100).');
+            return;
+        }
+
         const reservoirPct = Number.parseFloat(reservoirInput.value);
         if (!Number.isFinite(reservoirPct) || reservoirPct < 0 || reservoirPct > 100) {
-            showMixAlert('error', 'Reservoir percentage must be between 0 and 100.');
-            reservoirInput.focus();
+            if (reservoirInput) {
+                reservoirInput.classList.add('is-invalid');
+                reservoirInput.focus();
+            }
+            showMixAlert('error', 'Please enter a valid reservoir percentage (0 - 100).');
             return;
         }
 
@@ -414,23 +673,64 @@
         document.getElementById('mixLoading').style.display = 'block';
         setMixButtonBusy(button, true, '<span class="spinner-border spinner-border-sm me-2"></span>Generating...');
 
-        try {
-            const response = await fetch('/api/generation-mix/predict', {
-                method: 'POST',
+        async function callPredict(forceNew) {
+            const payload = {
+                predictionId: selectedPredictionId,
+                reservoirPct: reservoirPct
+            };
+            if (forceNew) {
+                payload.forceNew = true;
+            }
+
+            const isUpdate = !!selectedRunId;
+            const url = isUpdate
+                ? `/api/generation-mix/runs/${selectedRunId}/rerun`
+                : '/api/generation-mix/predict';
+            const method = isUpdate ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    predictionId: selectedPredictionId,
-                    reservoirPct: reservoirPct
-                })
+                body: JSON.stringify(payload)
             });
 
-            const result = await response.json();
+            let result = null;
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                result = await response.json();
+            } else {
+                const rawText = await response.text();
+                result = { error: rawText };
+            }
             if (!response.ok) {
                 throw new Error(result.error || 'Generation mix request failed.');
             }
+            return result;
+        }
 
-            renderMixResult(result);
-            showMixAlert('success', 'Generation mix generated successfully.');
+        try {
+            const isUpdate = !!selectedRunId;
+            let result = await callPredict(false);
+
+            const renderedPayload = isUpdate ? buildPayloadFromRun(result) : result;
+            renderMixResult(renderedPayload);
+
+            if (result?.reused) {
+                const runId = result?.generation_mix_run_id;
+                const overwrite = confirm(`A saved generation mix already exists for these exact inputs (Run #${runId}).\n\nPress OK to overwrite (recompute) it, or Cancel to reuse it.`);
+                if (overwrite) {
+                    result = await callPredict(true);
+                    const renderedOverwritePayload = isUpdate ? buildPayloadFromRun(result) : result;
+                    renderMixResult(renderedOverwritePayload);
+                    showMixAlert('success', 'Saved mix overwritten successfully for the same inputs.');
+                    return;
+                }
+                showMixAlert('success', `Saved mix found (Run #${runId}). Reused existing result instead of creating a duplicate.`);
+            } else if (result?.overwritten) {
+                showMixAlert('success', 'Saved mix overwritten successfully for the same inputs.');
+            } else {
+                showMixAlert('success', isUpdate ? 'Saved mix updated successfully.' : 'Generation mix generated successfully.');
+            }
         } catch (error) {
             showMixAlert('error', error.message || 'Generation mix request failed.');
         } finally {
@@ -443,6 +743,25 @@
     if (generateMixBtn) {
         generateMixBtn.addEventListener('click', generateMix);
     }
+
+    const reservoirPctInput = document.getElementById('reservoirPct');
+    if (reservoirPctInput) {
+        reservoirPctInput.addEventListener('input', () => {
+            const errorBox = document.getElementById('reservoirPctError');
+            if (validateReservoirInput(reservoirPctInput, errorBox)) {
+                reservoirPctInput.classList.remove('is-invalid');
+            }
+        });
+    }
+
+    if (prefillReservoirPct != null) {
+        const reservoirInput = document.getElementById('reservoirPct');
+        if (reservoirInput) {
+            reservoirInput.value = String(prefillReservoirPct);
+        }
+    }
+
+    loadSelectedRunIfPresent();
 </script>
 
 </th:block>

@@ -4,6 +4,8 @@ import com.example.loadforcasting.Entity.LoadRequest;
 import com.example.loadforcasting.systemflow.support.AbstractSystemFlowTest;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -20,6 +22,7 @@ class ForecastHistoryUpdateSystemFlowTest extends AbstractSystemFlowTest {
 
     @Test
     void updateHistoryRow_RecalculatesPredictionAndPersistsEditedValues() throws Exception {
+        LocalDateTime ts = LocalDateTime.now(ZoneId.systemDefault()).plusHours(1).withNano(0);
         stubLoadPrediction(1205.842);
         stubAnomalyDetection(false, 0.182, 0.58, "NORMAL",
                 "Load behavior matches historical patterns.", "local_outlier_factor");
@@ -27,7 +30,7 @@ class ForecastHistoryUpdateSystemFlowTest extends AbstractSystemFlowTest {
         String forecastResponse = mockMvc.perform(post("/api/forecast")
                         .contentType(APPLICATION_JSON)
                         .content(json(Map.of(
-                                "timestamp", "2026-04-13T14:00:00",
+                                "timestamp", ts.toString(),
                                 "temperature", 28.0,
                                 "humidity", 80.0,
                                 "publicEvent", 1
@@ -46,7 +49,7 @@ class ForecastHistoryUpdateSystemFlowTest extends AbstractSystemFlowTest {
         mockMvc.perform(put("/api/load/update/" + predictionId)
                         .contentType(APPLICATION_JSON)
                         .content(json(Map.of(
-                                "timestamp", "2026-04-13T14:00:00",
+                                "timestamp", ts.toString(),
                                 "temperature", 31.5,
                                 "humidity", 77.0,
                                 "publicEvent", 0
@@ -69,6 +72,7 @@ class ForecastHistoryUpdateSystemFlowTest extends AbstractSystemFlowTest {
 
     @Test
     void updateHistoryRow_ClearsOldFeedbackAndResolvedAnomalyFlags() throws Exception {
+        LocalDateTime ts = LocalDateTime.now(ZoneId.systemDefault()).plusHours(2).withNano(0);
         stubLoadPrediction(1200.752);
         stubAnomalyDetection(true, 3.186, 0.8775, "HIGH",
                 "Predicted load is strongly abnormal for this context.", "local_outlier_factor");
@@ -77,7 +81,7 @@ class ForecastHistoryUpdateSystemFlowTest extends AbstractSystemFlowTest {
         String forecastResponse = mockMvc.perform(post("/api/forecast")
                         .contentType(APPLICATION_JSON)
                         .content(json(Map.of(
-                                "timestamp", "2026-04-13T14:00:00",
+                                "timestamp", ts.toString(),
                                 "temperature", 30.0,
                                 "humidity", 80.0,
                                 "publicEvent", 0
@@ -110,7 +114,7 @@ class ForecastHistoryUpdateSystemFlowTest extends AbstractSystemFlowTest {
         mockMvc.perform(put("/api/load/update/" + predictionId)
                         .contentType(APPLICATION_JSON)
                         .content(json(Map.of(
-                                "timestamp", "2026-04-13T14:00:00",
+                                "timestamp", ts.toString(),
                                 "temperature", 28.0,
                                 "humidity", 80.0,
                                 "publicEvent", 1

@@ -14,6 +14,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.closeTo;
@@ -50,11 +51,11 @@ class GenerationMixControllerWebTest {
     void generationMixPage_WithPredictionId_LoadsForecastSummaryState() throws Exception {
         LoadRequest request = new LoadRequest();
         request.setId(60L);
-        request.setTimestamp(LocalDateTime.of(2026, 4, 13, 14, 0));
+        request.setTimestamp(LocalDateTime.now(ZoneId.systemDefault()).plusDays(1).withNano(0));
         request.setPredictedLoad(1205.842041015625);
 
         when(loadService.getRequestById(60L)).thenReturn(request);
-        when(generationMixService.estimateDailyDemandMwh(1205.842041015625)).thenReturn(28940.21);
+        when(generationMixService.getEstimatedDailyDemandForView(request)).thenReturn(28940.21);
 
         mockMvc.perform(get("/generation-mix")
                         .param("predictionId", "60")
@@ -85,7 +86,8 @@ class GenerationMixControllerWebTest {
     void predictGenerationMix_WithSavedForecast_ReturnsMixPayload() throws Exception {
         LoadRequest request = new LoadRequest();
         request.setId(60L);
-        request.setTimestamp(LocalDateTime.of(2026, 4, 13, 14, 0));
+        LocalDateTime ts = LocalDateTime.now(ZoneId.systemDefault()).plusDays(1).withNano(0);
+        request.setTimestamp(ts);
         request.setPredictedLoad(1205.842041015625);
 
         when(loadService.getRequestById(60L)).thenReturn(request);
@@ -94,7 +96,7 @@ class GenerationMixControllerWebTest {
                 "forecast_load", 1205.84,
                 "estimated_load_demand", 28940.21,
                 "total_mwh", 23660.0,
-                "date", "2026-04-13",
+                "date", ts.toLocalDate().toString(),
                 "prediction", Map.of("major_hydro", 8200.0),
                 "percentages", Map.of("major_hydro", 34.6)
         ));

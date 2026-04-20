@@ -34,12 +34,36 @@ public class WeatherPrediction {
     @Column(name = "solar_irradiance", nullable = false)
     private Double solarIrradiance;
 
+    @Column(name = "forecast_timestamp")
+    private LocalDateTime forecastTimestamp;
+
+    @Column(name = "weather_forecast_id")
+    private Long weatherForecastId;
+
+    @Column(name = "weather_forecast_run_id")
+    private Long weatherForecastRunId;
+
+    @Column(name = "source", length = 50)
+    private String source;
+
+    @Column(name = "model_version_label", length = 100)
+    private String modelVersionLabel;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        updatedAt = createdAt;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 
     // Default Constructor
@@ -67,7 +91,13 @@ public class WeatherPrediction {
     public Double getWindSpeed() { return windSpeed; }
     public Double getRainfall() { return rainfall; }
     public Double getSolarIrradiance() { return solarIrradiance; }
+    public LocalDateTime getForecastTimestamp() { return forecastTimestamp; }
+    public Long getWeatherForecastId() { return weatherForecastId; }
+    public Long getWeatherForecastRunId() { return weatherForecastRunId; }
+    public String getSource() { return source; }
+    public String getModelVersionLabel() { return modelVersionLabel; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
 
     // Setters
     public void setId(Long id) { this.id = id; }
@@ -78,5 +108,11 @@ public class WeatherPrediction {
     public void setWindSpeed(Double windSpeed) { this.windSpeed = windSpeed; }
     public void setRainfall(Double rainfall) { this.rainfall = rainfall; }
     public void setSolarIrradiance(Double solarIrradiance) { this.solarIrradiance = solarIrradiance; }
+    public void setForecastTimestamp(LocalDateTime forecastTimestamp) { this.forecastTimestamp = forecastTimestamp; }
+    public void setWeatherForecastId(Long weatherForecastId) { this.weatherForecastId = weatherForecastId; }
+    public void setWeatherForecastRunId(Long weatherForecastRunId) { this.weatherForecastRunId = weatherForecastRunId; }
+    public void setSource(String source) { this.source = source; }
+    public void setModelVersionLabel(String modelVersionLabel) { this.modelVersionLabel = modelVersionLabel; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

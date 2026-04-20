@@ -12,7 +12,7 @@ public class LoadRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm[:ss]")
     @Column(name = "timestamp", nullable = false)
     private LocalDateTime timestamp;
 
@@ -28,6 +28,30 @@ public class LoadRequest {
 
     @Column(name = "predicted_load")
     private double predictedLoad;
+
+    @Column(name = "input_signature", length = 200)
+    private String inputSignature;
+
+    @Column(name = "load_forecast_id")
+    private Long loadForecastId;
+
+    @Column(name = "load_forecast_run_id")
+    private Long loadForecastRunId;
+
+    @Column(name = "prediction_source", length = 50)
+    private String source;
+
+    @Column(name = "model_version_label", length = 100)
+    private String modelVersionLabel;
+
+    @Column(name = "estimated_daily_demand_mwh")
+    private Double estimatedDailyDemandMwh;
+
+    @Column(name = "run_reused")
+    private Boolean runReused;
+
+    @Transient
+    private Boolean forceNew;
 
     // ========== ANOMALY DETECTION FIELDS ==========
     @Column(name = "is_anomaly")
@@ -52,6 +76,14 @@ public class LoadRequest {
     public double getHumidity() { return humidity; }
     public int getPublicEvent() { return publicEvent; }
     public double getPredictedLoad() { return predictedLoad; }
+    public String getInputSignature() { return inputSignature; }
+    public Long getLoadForecastId() { return loadForecastId; }
+    public Long getLoadForecastRunId() { return loadForecastRunId; }
+    public String getSource() { return source; }
+    public String getModelVersionLabel() { return modelVersionLabel; }
+    public Double getEstimatedDailyDemandMwh() { return estimatedDailyDemandMwh; }
+    public Boolean getRunReused() { return runReused; }
+    public Boolean getForceNew() { return forceNew; }
 
     // Existing Setters
     public void setId(Long id) { this.id = id; }
@@ -60,6 +92,14 @@ public class LoadRequest {
     public void setHumidity(double humidity) { this.humidity = humidity; }
     public void setPublicEvent(int publicEvent) { this.publicEvent = publicEvent; }
     public void setPredictedLoad(double predictedLoad) { this.predictedLoad = predictedLoad; }
+    public void setInputSignature(String inputSignature) { this.inputSignature = inputSignature; }
+    public void setLoadForecastId(Long loadForecastId) { this.loadForecastId = loadForecastId; }
+    public void setLoadForecastRunId(Long loadForecastRunId) { this.loadForecastRunId = loadForecastRunId; }
+    public void setSource(String source) { this.source = source; }
+    public void setModelVersionLabel(String modelVersionLabel) { this.modelVersionLabel = modelVersionLabel; }
+    public void setEstimatedDailyDemandMwh(Double estimatedDailyDemandMwh) { this.estimatedDailyDemandMwh = estimatedDailyDemandMwh; }
+    public void setRunReused(Boolean runReused) { this.runReused = runReused; }
+    public void setForceNew(Boolean forceNew) { this.forceNew = forceNew; }
 
     // ========== NEW GETTERS AND SETTERS ==========
     public Boolean getIsAnomaly() { return isAnomaly; }

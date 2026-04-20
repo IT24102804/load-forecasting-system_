@@ -2,11 +2,23 @@ package com.example.loadforcasting.systemflow.support;
 
 import com.example.loadforcasting.Entity.LoadRequest;
 import com.example.loadforcasting.Repository.AnomalyRepository;
+import com.example.loadforcasting.Repository.AnomalyStatusEventRepository;
+import com.example.loadforcasting.Repository.CostPredictionRequestRepository;
+import com.example.loadforcasting.Repository.CostPredictionRunRepository;
+import com.example.loadforcasting.Repository.FeedbackReplyRepository;
 import com.example.loadforcasting.Repository.FeedbackRepository;
+import com.example.loadforcasting.Repository.GenerationMixRequestRepository;
+import com.example.loadforcasting.Repository.GenerationMixRunRepository;
 import com.example.loadforcasting.Repository.LoadDataRepository;
+import com.example.loadforcasting.Repository.LoadForecastRepository;
+import com.example.loadforcasting.Repository.LoadForecastRunRepository;
 import com.example.loadforcasting.Repository.LoadRepository;
+import com.example.loadforcasting.Repository.ModelVersionRepository;
 import com.example.loadforcasting.Repository.UserRepository;
+import com.example.loadforcasting.Repository.WeatherForecastRepository;
+import com.example.loadforcasting.Repository.WeatherForecastRunRepository;
 import com.example.loadforcasting.Repository.WeatherPredictionRepository;
+import com.example.loadforcasting.Service.CostPredictionService;
 import com.example.loadforcasting.Service.GenerationMixService;
 import com.example.loadforcasting.Service.LoadService;
 import com.example.loadforcasting.Service.WeatherPredictionService;
@@ -31,7 +43,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -59,22 +70,58 @@ public abstract class AbstractSystemFlowTest {
     protected GenerationMixService generationMixService;
 
     @Autowired
+    protected CostPredictionService costPredictionService;
+
+    @Autowired
     protected LoadRepository loadRepository;
 
     @Autowired
     protected AnomalyRepository anomalyRepository;
 
     @Autowired
+    protected AnomalyStatusEventRepository anomalyStatusEventRepository;
+
+    @Autowired
     protected FeedbackRepository feedbackRepository;
 
     @Autowired
+    protected FeedbackReplyRepository feedbackReplyRepository;
+
+    @Autowired
     protected WeatherPredictionRepository weatherPredictionRepository;
+
+    @Autowired
+    protected WeatherForecastRepository weatherForecastRepository;
+
+    @Autowired
+    protected WeatherForecastRunRepository weatherForecastRunRepository;
 
     @Autowired
     protected UserRepository userRepository;
 
     @Autowired
     protected LoadDataRepository loadDataRepository;
+
+    @Autowired
+    protected LoadForecastRepository loadForecastRepository;
+
+    @Autowired
+    protected LoadForecastRunRepository loadForecastRunRepository;
+
+    @Autowired
+    protected GenerationMixRequestRepository generationMixRequestRepository;
+
+    @Autowired
+    protected GenerationMixRunRepository generationMixRunRepository;
+
+    @Autowired
+    protected CostPredictionRequestRepository costPredictionRequestRepository;
+
+    @Autowired
+    protected CostPredictionRunRepository costPredictionRunRepository;
+
+    @Autowired
+    protected ModelVersionRepository modelVersionRepository;
 
     @DynamicPropertySource
     static void configureDynamicProperties(DynamicPropertyRegistry registry) {
@@ -86,15 +133,27 @@ public abstract class AbstractSystemFlowTest {
         ReflectionTestUtils.setField(loadService, "PYTHON_LOAD_API_URL", AI_STUBS.loadPredictUrl());
         ReflectionTestUtils.setField(weatherPredictionService, "PYTHON_API_URL", AI_STUBS.weatherPredictUrl());
         ReflectionTestUtils.setField(generationMixService, "generationMixServiceUrl", AI_STUBS.generationMixPredictUrl());
+        ReflectionTestUtils.setField(costPredictionService, "costServiceUrl", AI_STUBS.costPredictUrl());
 
         AI_STUBS.reset();
 
-        anomalyRepository.deleteAll();
+        costPredictionRunRepository.deleteAll();
+        costPredictionRequestRepository.deleteAll();
+        generationMixRunRepository.deleteAll();
+        generationMixRequestRepository.deleteAll();
+        feedbackReplyRepository.deleteAll();
         feedbackRepository.deleteAll();
+        anomalyStatusEventRepository.deleteAll();
+        anomalyRepository.deleteAll();
         loadRepository.deleteAll();
+        loadForecastRunRepository.deleteAll();
+        loadForecastRepository.deleteAll();
         weatherPredictionRepository.deleteAll();
+        weatherForecastRunRepository.deleteAll();
+        weatherForecastRepository.deleteAll();
         loadDataRepository.deleteAll();
         userRepository.deleteAll();
+        modelVersionRepository.deleteAll();
     }
 
     protected void stubLoadPrediction(double loadDemand) {
@@ -198,6 +257,22 @@ public abstract class AbstractSystemFlowTest {
         return AI_STUBS.lastGenerationMixPredictBody();
     }
 
+    protected void stubCostPrediction(double unitCost) {
+        AI_STUBS.stubCostPredict(body -> StubResponse.json(200, """
+                {
+                  \"unit_cost\": %s
+                }
+                """.formatted(unitCost)));
+    }
+
+    protected void stubCostPredictionError(int statusCode, String body) {
+        AI_STUBS.stubCostPredict(ignored -> new StubResponse(statusCode, body, MediaType.APPLICATION_JSON_VALUE));
+    }
+
+    protected String lastCostPredictionRequestBody() {
+        return AI_STUBS.lastCostPredictBody();
+    }
+
     protected MockHttpSession adminSession() {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute("userid", 1);
@@ -229,11 +304,13 @@ public abstract class AbstractSystemFlowTest {
         private final StubEndpoint anomalyDetect = new StubEndpoint();
         private final StubEndpoint anomalyFeedback = new StubEndpoint();
         private final StubEndpoint generationMixPredict = new StubEndpoint();
+        private final StubEndpoint costPredict = new StubEndpoint();
 
         private final HttpServer loadServer;
         private final HttpServer weatherServer;
         private final HttpServer anomalyServer;
         private final HttpServer generationMixServer;
+        private final HttpServer costServer;
 
         private AiStubServers() {
             try {
@@ -253,6 +330,10 @@ public abstract class AbstractSystemFlowTest {
                 generationMixServer = HttpServer.create(new InetSocketAddress(0), 0);
                 generationMixServer.createContext("/predict", generationMixPredict);
                 generationMixServer.start();
+
+                costServer = HttpServer.create(new InetSocketAddress(0), 0);
+                costServer.createContext("/predict", costPredict);
+                costServer.start();
             } catch (IOException e) {
                 throw new IllegalStateException("Failed to start AI stub servers", e);
             }
@@ -260,6 +341,13 @@ public abstract class AbstractSystemFlowTest {
         }
 
         private void reset() {
+            loadPredict.reset();
+            weatherPredict.reset();
+            anomalyDetect.reset();
+            anomalyFeedback.reset();
+            generationMixPredict.reset();
+            costPredict.reset();
+
             stubLoadPredict(body -> StubResponse.json(200, """
                     {
                       "load_demand": 1500.0
@@ -316,6 +404,11 @@ public abstract class AbstractSystemFlowTest {
                       "total_mwh": 23660.0
                     }
                     """));
+            stubCostPredict(body -> StubResponse.json(200, """
+                    {
+                      "unit_cost": 52.0
+                    }
+                    """));
         }
 
         private String loadPredictUrl() {
@@ -332,6 +425,10 @@ public abstract class AbstractSystemFlowTest {
 
         private String generationMixPredictUrl() {
             return "http://localhost:" + generationMixServer.getAddress().getPort() + "/predict";
+        }
+
+        private String costPredictUrl() {
+            return "http://localhost:" + costServer.getAddress().getPort() + "/predict";
         }
 
         private void stubLoadPredict(Function<String, StubResponse> responder) {
@@ -354,53 +451,67 @@ public abstract class AbstractSystemFlowTest {
             generationMixPredict.setResponder(responder);
         }
 
-        private int anomalyFeedbackHitCount() {
-            return anomalyFeedback.hitCount();
+        private void stubCostPredict(Function<String, StubResponse> responder) {
+            costPredict.setResponder(responder);
         }
 
         private String lastAnomalyFeedbackBody() {
             return anomalyFeedback.lastRequestBody();
         }
 
+        private int anomalyFeedbackHitCount() {
+            return anomalyFeedback.hitCount();
+        }
+
         private String lastGenerationMixPredictBody() {
             return generationMixPredict.lastRequestBody();
+        }
+
+        private String lastCostPredictBody() {
+            return costPredict.lastRequestBody();
         }
     }
 
     private static final class StubEndpoint implements HttpHandler {
-        private final AtomicReference<Function<String, StubResponse>> responder =
-                new AtomicReference<>(body -> StubResponse.json(200, "{}"));
+        private final AtomicReference<Function<String, StubResponse>> responder = new AtomicReference<>();
         private final AtomicReference<String> lastRequestBody = new AtomicReference<>("");
-        private final AtomicInteger hitCount = new AtomicInteger();
+        private final AtomicInteger hitCount = new AtomicInteger(0);
 
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            hitCount.incrementAndGet();
             String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             lastRequestBody.set(body);
-            hitCount.incrementAndGet();
 
-            StubResponse response = responder.get().apply(body);
-            byte[] payload = response.body().getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", response.contentType());
-            exchange.sendResponseHeaders(response.statusCode(), payload.length);
+            Function<String, StubResponse> fn = responder.get();
+            StubResponse response = fn != null
+                    ? fn.apply(body)
+                    : new StubResponse(500, "{\"error\":\"No stub configured\"}", MediaType.APPLICATION_JSON_VALUE);
 
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(payload);
+            byte[] responseBytes = response.body().getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", response.contentType());
+            exchange.sendResponseHeaders(response.statusCode(), responseBytes.length);
+            try (OutputStream outputStream = exchange.getResponseBody()) {
+                outputStream.write(responseBytes);
             }
         }
 
-        private void setResponder(Function<String, StubResponse> newResponder) {
-            responder.set(newResponder);
+        private void setResponder(Function<String, StubResponse> responder) {
+            this.responder.set(responder);
+        }
+
+        private void reset() {
+            responder.set(null);
             lastRequestBody.set("");
             hitCount.set(0);
         }
 
-        private int hitCount() {
-            return hitCount.get();
-        }
-
         private String lastRequestBody() {
             return lastRequestBody.get();
+        }
+
+        private int hitCount() {
+            return hitCount.get();
         }
     }
 

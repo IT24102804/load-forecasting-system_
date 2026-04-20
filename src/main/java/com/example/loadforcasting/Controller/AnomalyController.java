@@ -104,7 +104,7 @@ public class AnomalyController {
         if (!isAdmin(session)) return "redirect:/";
 
         try {
-            anomalyService.acknowledgeAnomaly(id);
+            anomalyService.acknowledgeAnomaly(id, (Integer) session.getAttribute("userid"));
             redirectAttributes.addFlashAttribute("successMessage",
                     "Anomaly #" + id + " marked as Acknowledged.");
         } catch (Exception e) {
@@ -126,7 +126,7 @@ public class AnomalyController {
         try {
             String note = (resolutionNote != null && !resolutionNote.isBlank())
                     ? resolutionNote : "Resolved by operator.";
-            anomalyService.resolveAnomaly(id, note);
+            anomalyService.resolveAnomaly(id, note, (Integer) session.getAttribute("userid"));
             redirectAttributes.addFlashAttribute("successMessage",
                     "Anomaly #" + id + " has been resolved.");
         } catch (Exception e) {

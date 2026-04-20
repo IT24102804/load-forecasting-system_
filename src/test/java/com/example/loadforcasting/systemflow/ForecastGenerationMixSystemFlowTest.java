@@ -4,6 +4,8 @@ import com.example.loadforcasting.Entity.LoadRequest;
 import com.example.loadforcasting.systemflow.support.AbstractSystemFlowTest;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -17,6 +19,7 @@ class ForecastGenerationMixSystemFlowTest extends AbstractSystemFlowTest {
 
     @Test
     void forecastThenGenerationMix_UsesSavedForecastDemandBridge() throws Exception {
+        LocalDateTime ts = LocalDateTime.now(ZoneId.systemDefault()).plusHours(1).withNano(0);
         stubLoadPrediction(1205.842);
         stubAnomalyDetection(false, 0.182, 0.58, "NORMAL",
                 "Load behavior matches historical patterns.", "local_outlier_factor");
@@ -24,7 +27,7 @@ class ForecastGenerationMixSystemFlowTest extends AbstractSystemFlowTest {
         mockMvc.perform(post("/api/forecast")
                         .contentType(APPLICATION_JSON)
                         .content(json(Map.of(
-                                "timestamp", "2026-04-13T14:00:00",
+                                "timestamp", ts.toString(),
                                 "temperature", 28.0,
                                 "humidity", 80.0,
                                 "publicEvent", 1
@@ -51,7 +54,7 @@ class ForecastGenerationMixSystemFlowTest extends AbstractSystemFlowTest {
                 .andExpect(jsonPath("$.prediction.major_hydro").value(8200.0));
 
         assertEquals(1, loadRepository.count());
-        assertTrue(lastGenerationMixRequestBody().contains("\"date\":\"2026-04-13\""));
+        assertTrue(lastGenerationMixRequestBody().contains("\"date\":\"" + ts.toLocalDate() + "\""));
         assertTrue(lastGenerationMixRequestBody().contains("\"reservoir_pct\":72.5"));
         assertTrue(lastGenerationMixRequestBody().contains("\"load_demand\":28940.21"));
     }

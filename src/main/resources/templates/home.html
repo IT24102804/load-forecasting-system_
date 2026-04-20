@@ -26,7 +26,7 @@
           <label for="ts" class="form-label">Target Timestamp <span class="text-danger">*</span></label>
           <input type="datetime-local" id="ts" class="form-control" required>
           <div class="invalid-feedback">Please select a valid date and time.</div>
-          <div class="form-text"><i class="fas fa-info-circle me-1"></i>Select the future date and time for the forecast.</div>
+          <div class="form-text"><i class="fas fa-info-circle me-1"></i>Select the date and time for the forecast.</div>
         </div>
 
         <div class="row mb-4">
@@ -69,7 +69,7 @@
       <div id="resultContainer" class="result-box text-center mt-4">
         <h6 class="text-uppercase fw-bold mb-2" style="color:var(--slate); font-size:0.8rem; letter-spacing:1px;">Predicted Output</h6>
         <span id="result" class="display-4 fw-bold" style="color:var(--navy);">--</span>
-        <span class="h4 text-muted"> kW</span>
+        <span class="h4 text-muted"> MW</span>
         <div class="mt-3">
           <a id="generateMixLink" th:href="@{/generation-mix}" class="btn btn-sm btn-primary rounded-pill me-2" style="display:none;">
             <i class="fas fa-industry me-1"></i>Generate Mix
@@ -102,13 +102,18 @@
                 <i class="fas fa-times me-1"></i>Needs Review
               </button>
             </div>
+            <div class="mt-2 small">
+              <a id="detailedFeedbackLink" th:href="@{/feedback/submit}" class="link-primary text-decoration-none fw-semibold" style="display:none;">
+                <i class="fas fa-comment-dots me-1"></i>Add detailed feedback
+              </a>
+            </div>
             <div class="mt-3 small">
               <a th:href="@{/forecast/dashboard}" class="link-primary text-decoration-none fw-semibold">
                 <i class="fas fa-chart-line me-1"></i>Open the full forecast dashboard for charts and history
               </a>
             </div>
             <div id="feedbackConfirm" class="alert alert-success p-2 mt-3 mb-0 small" style="display:none;">
-              <i class="fas fa-check-circle me-1"></i>Feedback recorded. Thank you!
+              <i class="fas fa-check-circle me-1"></i><span id="feedbackConfirmText">Feedback recorded. Thank you!</span>
             </div>
             <div id="feedbackError" class="alert alert-danger p-2 mt-3 mb-0 small" style="display:none;">
               <i class="fas fa-exclamation-circle me-1"></i><span id="feedbackErrorText">Could not save feedback.</span>
@@ -123,6 +128,7 @@
 
 <script>
   let currentPredictionId = null;
+  let currentAnomalyId = null;
   let weatherFetchRequestId = 0;
 
   function setButtonBusy(button, isBusy, busyHtml) {
@@ -149,6 +155,48 @@
     if (isDisabled && clickedButton) {
       clickedButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
     }
+  }
+
+  function setFeedbackVisibility({ showButtons = true, showConfirm = false, showError = false } = {}) {
+    const feedbackButtons = document.getElementById('feedbackButtons');
+    const feedbackConfirm = document.getElementById('feedbackConfirm');
+    const feedbackError = document.getElementById('feedbackError');
+
+    if (feedbackButtons) {
+      feedbackButtons.hidden = !showButtons;
+      feedbackButtons.style.display = showButtons ? 'flex' : 'none';
+    }
+    if (feedbackConfirm) {
+      feedbackConfirm.hidden = !showConfirm;
+      feedbackConfirm.style.display = showConfirm ? 'block' : 'none';
+    }
+    if (feedbackError) {
+      feedbackError.hidden = !showError;
+      feedbackError.style.display = showError ? 'block' : 'none';
+    }
+  }
+
+  function updateDetailedFeedbackLink() {
+    const link = document.getElementById('detailedFeedbackLink');
+    if (!link) {
+      return;
+    }
+
+    if (!currentPredictionId) {
+      link.style.display = 'none';
+      link.href = '/feedback/submit';
+      return;
+    }
+
+    const params = new URLSearchParams({
+      predictionId: currentPredictionId,
+      feedbackType: 'ANOMALY_FEEDBACK'
+    });
+    if (currentAnomalyId) {
+      params.set('anomalyId', currentAnomalyId);
+    }
+    link.href = `/feedback/submit?${params.toString()}`;
+    link.style.display = 'inline-flex';
   }
 
   function setWeatherInputsBusy(isBusy) {
@@ -244,13 +292,14 @@
     document.getElementById('resultContainer').style.display = 'none';
     document.getElementById('anomalyWarning').style.display = 'none';
     document.getElementById('errorBox').style.display = 'none';
-    document.getElementById('feedbackButtons').style.display = 'flex';
-    document.getElementById('feedbackConfirm').style.display = 'none';
-    document.getElementById('feedbackError').style.display = 'none';
+    setFeedbackButtonsDisabled(false);
+    setFeedbackVisibility({ showButtons: true, showConfirm: false, showError: false });
     document.getElementById('loading').style.display = 'block';
     currentPredictionId = null;
+    currentAnomalyId = null;
     generateMixLink.style.display = 'none';
     generateMixLink.href = '/generation-mix';
+    updateDetailedFeedbackLink();
     setButtonBusy(submitBtn, true, '<span class="spinner-border spinner-border-sm me-2"></span>Predicting...');
 
     let timestamp = document.getElementById('ts').value;
@@ -288,6 +337,8 @@
         document.getElementById('anomalySeverity').innerText = data.severity || 'MEDIUM';
         document.getElementById('anomalyConfidence').innerText = data.confidence ? `${(data.confidence * 100).toFixed(1)}%` : 'N/A';
         document.getElementById('anomalyModel').innerText = (data.model_name || data.source || 'local_outlier_factor').replaceAll('_', ' ');
+        currentAnomalyId = data.anomalyId || null;
+        updateDetailedFeedbackLink();
         document.getElementById('anomalyWarning').style.display = 'block';
       }
 
@@ -325,12 +376,18 @@
         throw new Error(errorMessage);
       }
 
-      document.getElementById('feedbackButtons').style.display = 'none';
-      document.getElementById('feedbackConfirm').style.display = 'block';
+      const data = await response.json();
+      currentAnomalyId = data.anomalyId || currentAnomalyId;
+      updateDetailedFeedbackLink();
+      document.getElementById('feedbackConfirmText').innerText = data.feedbackId
+        ? `Feedback recorded (Entry #${data.feedbackId}). Thank you!`
+        : 'Feedback recorded. Thank you!';
+      setFeedbackButtonsDisabled(false);
+      setFeedbackVisibility({ showButtons: false, showConfirm: true, showError: false });
     } catch (e) {
       setFeedbackButtonsDisabled(false);
       document.getElementById('feedbackErrorText').innerText = e.message || 'Could not save feedback. Please try again.';
-      document.getElementById('feedbackError').style.display = 'block';
+      setFeedbackVisibility({ showButtons: true, showConfirm: false, showError: true });
     }
   }
 

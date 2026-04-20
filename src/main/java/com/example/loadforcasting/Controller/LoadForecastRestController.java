@@ -113,9 +113,9 @@ public class LoadForecastRestController {
     @DeleteMapping("/delete/{id}")
     public Map<String, Object> deleteRecord(@PathVariable Long id) {
         if (loadRepository.existsById(id)) {
-            loadRepository.deleteById(id);
-            anomalyDetectionService.clearAnomaliesForPrediction(id);
             feedbackService.deleteByPredictionId(id);
+            anomalyDetectionService.clearAnomaliesForPrediction(id);
+            loadRepository.deleteById(id);
         }
         return Map.of("status", "deleted", "id", id);
     }
@@ -143,8 +143,10 @@ public class LoadForecastRestController {
             existing.setFeedbackGiven(false);
             existing.setFeedbackAgreed(null);
 
-            double prediction = loadService.predictValue(existing);
+            loadService.repredictAndUpdate(existing, true);
+            double prediction = existing.getPredictedLoad();
 
+            feedbackService.deleteByPredictionId(id);
             anomalyDetectionService.clearAnomaliesForPrediction(id);
             Map<String, Object> anomalyResult = anomalyDetectionService.detectAnomaly(
                     id,
@@ -167,7 +169,6 @@ public class LoadForecastRestController {
                 existing.setAnomalyScore(0.0);
             }
             loadService.updateRequestWithAnomalyInfo(existing);
-            feedbackService.deleteByPredictionId(id);
 
             Map<String, Object> response = new HashMap<>();
             response.put("status", "updated");
@@ -180,6 +181,10 @@ public class LoadForecastRestController {
             response.put("is_anomaly", anomalyResult.getOrDefault("is_anomaly", false));
             response.put("severity", anomalyResult.getOrDefault("severity", "NORMAL"));
             response.put("anomaly_score", existing.getAnomalyScore());
+            response.put("runId", existing.getLoadForecastRunId());
+            response.put("modelVersion", existing.getModelVersionLabel());
+            response.put("source", existing.getSource());
+            response.put("reused", existing.getRunReused());
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

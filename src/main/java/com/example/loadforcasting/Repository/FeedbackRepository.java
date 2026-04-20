@@ -1,7 +1,6 @@
 package com.example.loadforcasting.Repository;
 
 import com.example.loadforcasting.Entity.Feedback;
-import com.example.loadforcasting.Repository.FeedbackRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -15,6 +14,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
 
     // Find feedback by user name (if no email)
     List<Feedback> findByUserNameContainingIgnoreCaseOrderByCreatedAtDesc(String name);
+
+    List<Feedback> findBySubmittedByUser_IdOrderByCreatedAtDesc(Integer userId);
 
     // Get all feedback sorted by date (newest first)
     List<Feedback> findAllByOrderByCreatedAtDesc();

@@ -1,6 +1,11 @@
 package com.example.loadforcasting.Service;
 
+import com.example.loadforcasting.Entity.ModelVersion;
+import com.example.loadforcasting.Entity.WeatherForecast;
+import com.example.loadforcasting.Entity.WeatherForecastRun;
 import com.example.loadforcasting.Entity.WeatherPrediction;
+import com.example.loadforcasting.Repository.WeatherForecastRepository;
+import com.example.loadforcasting.Repository.WeatherForecastRunRepository;
 import com.example.loadforcasting.Repository.WeatherPredictionRepository;
 import com.example.loadforcasting.dto.WeatherPredictionResult;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +15,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
@@ -29,6 +35,16 @@ public class WeatherPredictionService {
     @Autowired
     private WeatherPredictionRepository repository;
 
+    @Autowired
+    private WeatherForecastRepository weatherForecastRepository;
+
+    @Autowired
+    private WeatherForecastRunRepository weatherForecastRunRepository;
+
+    @Autowired
+    private ModelVersionService modelVersionService;
+
+    @SuppressWarnings("FieldCanBeLocal")
     private String PYTHON_API_URL = "http://localhost:5000/predict";
 
     public WeatherPredictionResult predictTransient(String dateTime) {
@@ -47,64 +63,103 @@ public class WeatherPredictionService {
                     String.valueOf(predictions.getOrDefault("source", "python_model"))
             );
         } catch (Exception e) {
-            System.err.println("Error in predictTransient: " + e.getMessage());
             throw new RuntimeException("Error predicting weather: " + e.getMessage(), e);
         }
     }
 
+    @Transactional
     public WeatherPrediction predictAndSave(String dateTime) {
-        try {
-            System.out.println("Received weather prediction request for: " + dateTime);
-
-            WeatherPredictionResult result = predictTransient(dateTime);
-            WeatherPrediction prediction = new WeatherPrediction();
-            applyPrediction(prediction, result);
-
-            WeatherPrediction saved = repository.save(prediction);
-            System.out.println("Prediction saved with ID: " + saved.getId());
-
-            return saved;
-        } catch (Exception e) {
-            System.err.println("Error in predictAndSave: " + e.getMessage());
-            throw new RuntimeException("Error predicting weather: " + e.getMessage(), e);
-        }
+        return predictAndSave(dateTime, false);
     }
 
-    public WeatherPrediction updatePrediction(Long id, String dateTime) {
-        try {
-            Optional<WeatherPrediction> existingOpt = repository.findById(id);
-            if (existingOpt.isEmpty()) {
-                throw new RuntimeException("Prediction with ID " + id + " not found");
+    @Transactional
+    public WeatherPrediction predictAndSave(String dateTime, boolean forceNew) {
+        WeatherPredictionResult result = predictTransient(dateTime);
+        ModelVersion modelVersion = modelVersionService.resolveCurrent(
+                ModelVersionService.MODULE_WEATHER,
+                "weather_ai_predictor"
+        );
+
+        WeatherForecast weatherForecast = weatherForecastRepository.findByForecastTimestamp(result.predictionDateTime())
+                .orElseGet(() -> {
+                    WeatherForecast entity = new WeatherForecast();
+                    entity.setForecastTimestamp(result.predictionDateTime());
+                    entity.setCurrentStatus("ACTIVE");
+                    return weatherForecastRepository.save(entity);
+                });
+
+        Optional<WeatherForecastRun> existingRun = weatherForecastRunRepository
+                .findFirstByWeatherForecastAndModelVersionOrderByCreatedAtDesc(weatherForecast, modelVersion);
+
+        WeatherForecastRun run;
+        if (existingRun.isPresent() && !forceNew) {
+            run = existingRun.get();
+            WeatherPrediction existingPrediction = repository.findFirstByWeatherForecastRunIdOrderByCreatedAtDesc(run.getId());
+            if (existingPrediction != null) {
+                hydrateLegacyPrediction(existingPrediction, result, weatherForecast, run, modelVersion, true);
+                return repository.save(existingPrediction);
             }
-
-            System.out.println("Updating prediction ID: " + id + " with new date: " + dateTime);
-
-            WeatherPredictionResult result = predictTransient(dateTime);
-            WeatherPrediction prediction = existingOpt.get();
-            applyPrediction(prediction, result);
-
-            WeatherPrediction updated = repository.save(prediction);
-            System.out.println("Prediction updated with ID: " + updated.getId());
-
-            return updated;
-        } catch (Exception e) {
-            System.err.println("Error in updatePrediction: " + e.getMessage());
-            throw new RuntimeException("Error updating weather prediction: " + e.getMessage(), e);
         }
+
+        run = new WeatherForecastRun();
+        run.setWeatherForecast(weatherForecast);
+        run.setModelVersion(modelVersion);
+        run.setTemperature(result.temperature());
+        run.setHumidity(result.humidity());
+        run.setWindSpeed(result.windSpeed());
+        run.setRainfall(result.rainfall());
+        run.setSolarIrradiance(result.solarIrradiance());
+        run.setSource(result.source());
+        run.setRunReason(forceNew ? "FORCED_RERUN" : "NEW_TIMESTAMP");
+        run.setReused(false);
+        run = weatherForecastRunRepository.save(run);
+
+        WeatherPrediction prediction = new WeatherPrediction();
+        hydrateLegacyPrediction(prediction, result, weatherForecast, run, modelVersion, false);
+        return repository.save(prediction);
+    }
+
+    @Transactional
+    public WeatherPrediction updatePrediction(Long id, String dateTime) {
+        WeatherPrediction prediction = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Prediction with ID " + id + " not found"));
+        WeatherPredictionResult result = predictTransient(dateTime);
+        ModelVersion modelVersion = modelVersionService.resolveCurrent(
+                ModelVersionService.MODULE_WEATHER,
+                "weather_ai_predictor"
+        );
+
+        WeatherForecast weatherForecast = weatherForecastRepository.findByForecastTimestamp(result.predictionDateTime())
+                .orElseGet(() -> {
+                    WeatherForecast entity = new WeatherForecast();
+                    entity.setForecastTimestamp(result.predictionDateTime());
+                    entity.setCurrentStatus("ACTIVE");
+                    return weatherForecastRepository.save(entity);
+                });
+
+        WeatherForecastRun run = new WeatherForecastRun();
+        run.setWeatherForecast(weatherForecast);
+        run.setModelVersion(modelVersion);
+        run.setTemperature(result.temperature());
+        run.setHumidity(result.humidity());
+        run.setWindSpeed(result.windSpeed());
+        run.setRainfall(result.rainfall());
+        run.setSolarIrradiance(result.solarIrradiance());
+        run.setSource(result.source());
+        run.setRunReason("FORCED_RERUN");
+        run.setReused(false);
+        run = weatherForecastRunRepository.save(run);
+
+        hydrateLegacyPrediction(prediction, result, weatherForecast, run, modelVersion, false);
+        return repository.save(prediction);
     }
 
     public boolean deletePrediction(Long id) {
-        try {
-            if (!repository.existsById(id)) {
-                throw new RuntimeException("Prediction with ID " + id + " not found");
-            }
-            repository.deleteById(id);
-            System.out.println("Prediction deleted with ID: " + id);
-            return true;
-        } catch (Exception e) {
-            System.err.println("Error in deletePrediction: " + e.getMessage());
-            throw new RuntimeException("Error deleting weather prediction: " + e.getMessage(), e);
+        if (!repository.existsById(id)) {
+            throw new RuntimeException("Prediction with ID " + id + " not found");
         }
+        repository.deleteById(id);
+        return true;
     }
 
     public List<WeatherPrediction> getAllPredictions() {
@@ -123,7 +178,12 @@ public class WeatherPredictionService {
         return stats;
     }
 
-    private void applyPrediction(WeatherPrediction prediction, WeatherPredictionResult result) {
+    private void hydrateLegacyPrediction(WeatherPrediction prediction,
+                                         WeatherPredictionResult result,
+                                         WeatherForecast weatherForecast,
+                                         WeatherForecastRun run,
+                                         ModelVersion modelVersion,
+                                         boolean reused) {
         prediction.setPredictionDate(result.predictionDateTime().toLocalDate());
         prediction.setPredictionTime(result.predictionDateTime().toLocalTime());
         prediction.setTemperature(result.temperature());
@@ -131,6 +191,11 @@ public class WeatherPredictionService {
         prediction.setWindSpeed(result.windSpeed());
         prediction.setRainfall(result.rainfall());
         prediction.setSolarIrradiance(result.solarIrradiance());
+        prediction.setForecastTimestamp(result.predictionDateTime());
+        prediction.setWeatherForecastId(weatherForecast.getId());
+        prediction.setWeatherForecastRunId(run.getId());
+        prediction.setSource(reused ? run.getSource() : result.source());
+        prediction.setModelVersionLabel(modelVersion.getVersionLabel());
     }
 
     private LocalDateTime parseDateTime(String dateTime) {
@@ -183,7 +248,6 @@ public class WeatherPredictionService {
 
             return getFallbackPredictions();
         } catch (Exception e) {
-            System.out.println("Python weather service offline, using fallback.");
             return getFallbackPredictions();
         }
     }

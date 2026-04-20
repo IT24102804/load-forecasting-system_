@@ -15,6 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -24,6 +25,7 @@ import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -76,16 +78,25 @@ class LoadForecastRestControllerWebTest {
 
     @Test
     void updateRecord_Success_RecalculatesAndPersistsEditedPrediction() throws Exception {
+        LocalDateTime ts = LocalDateTime.now(ZoneId.systemDefault()).plusHours(1).withNano(0);
         LoadRequest existing = new LoadRequest();
         existing.setId(15L);
-        existing.setTimestamp(LocalDateTime.of(2026, 4, 13, 14, 0));
+        existing.setTimestamp(ts);
         existing.setTemperature(28.0);
         existing.setHumidity(80.0);
         existing.setPublicEvent(1);
         existing.setPredictedLoad(1205.842);
 
         when(loadRepository.findById(15L)).thenReturn(Optional.of(existing));
-        when(loadService.predictValue(any(LoadRequest.class))).thenReturn(1198.55);
+        when(loadService.repredictAndUpdate(any(LoadRequest.class), eq(true))).thenAnswer(invocation -> {
+            LoadRequest updated = invocation.getArgument(0);
+            updated.setPredictedLoad(1198.55);
+            updated.setLoadForecastRunId(88L);
+            updated.setModelVersionLabel("v1");
+            updated.setSource("python_model");
+            updated.setRunReused(false);
+            return updated;
+        });
         when(anomalyDetectionService.detectAnomaly(
                 anyLong(), any(LocalDateTime.class), anyDouble(), anyDouble(), anyDouble(),
                 anyInt(), anyInt(), anyInt(), anyInt()
@@ -97,14 +108,14 @@ class LoadForecastRestControllerWebTest {
 
         mockMvc.perform(put("/api/load/update/15")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .content(String.format("""
                                 {
-                                  "timestamp": "2026-04-13T14:00:00",
-                                  "temperature": 31.5,
-                                  "humidity": 77.0,
-                                  "publicEvent": 0
+                                  \"timestamp\": \"%s\",
+                                  \"temperature\": 31.5,
+                                  \"humidity\": 77.0,
+                                  \"publicEvent\": 0
                                 }
-                                """))
+                                """, ts)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("updated"))
                 .andExpect(jsonPath("$.id").value(15))
@@ -113,13 +124,13 @@ class LoadForecastRestControllerWebTest {
                 .andExpect(jsonPath("$.severity").value("MEDIUM"))
                 .andExpect(jsonPath("$.public_event").value(0));
 
-        verify(loadService).predictValue(argThat(request ->
+        verify(loadService).repredictAndUpdate(argThat(request ->
                 request.getId().equals(15L)
-                        && request.getTimestamp().equals(LocalDateTime.of(2026, 4, 13, 14, 0))
+                        && request.getTimestamp().equals(ts)
                         && request.getTemperature() == 31.5
                         && request.getHumidity() == 77.0
                         && request.getPublicEvent() == 0
-        ));
+        ), eq(true));
         verify(anomalyDetectionService).clearAnomaliesForPrediction(15L);
         verify(feedbackService).deleteByPredictionId(15L);
         verify(loadService).updateRequestWithAnomalyInfo(argThat(request ->

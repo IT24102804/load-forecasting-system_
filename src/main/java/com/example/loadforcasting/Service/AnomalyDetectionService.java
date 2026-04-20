@@ -1,17 +1,27 @@
 package com.example.loadforcasting.Service;
 
 import com.example.loadforcasting.Entity.Anomaly;
+import com.example.loadforcasting.Entity.AnomalyStatusEvent;
 import com.example.loadforcasting.Entity.LoadData;
+import com.example.loadforcasting.Entity.LoadForecastRun;
+import com.example.loadforcasting.Entity.LoadRequest;
+import com.example.loadforcasting.Entity.ModelVersion;
+import com.example.loadforcasting.Entity.User;
 import com.example.loadforcasting.Repository.AnomalyRepository;
+import com.example.loadforcasting.Repository.AnomalyStatusEventRepository;
 import com.example.loadforcasting.Repository.LoadDataRepository;
+import com.example.loadforcasting.Repository.LoadRepository;
+import com.example.loadforcasting.Repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class AnomalyDetectionService {
@@ -25,12 +35,23 @@ public class AnomalyDetectionService {
     private AnomalyRepository anomalyRepository;
 
     @Autowired
+    private AnomalyStatusEventRepository anomalyStatusEventRepository;
+
+    @Autowired
     private LoadDataRepository loadDataRepository;
 
-    // =====================================================
-    // MAIN DETECTION — called from LoadController
-    // Tries Python Flask first, falls back to rule-based
-    // =====================================================
+    @Autowired
+    private LoadRepository loadRepository;
+
+    @Autowired
+    private LoadService loadService;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private ModelVersionService modelVersionService;
+
     public Map<String, Object> detectAnomaly(Long predictionId, LocalDateTime forecastTimestamp,
                                              double predictedLoad, double temperature,
                                              double humidity, int publicEvent,
@@ -38,7 +59,6 @@ public class AnomalyDetectionService {
         Map<String, Object> result;
 
         try {
-            // Try Python Flask API first
             Map<String, Object> request = new HashMap<>();
 
             request.put("load", predictedLoad);
@@ -55,31 +75,22 @@ public class AnomalyDetectionService {
 
             result = new HashMap<>();
             if (response != null) {
-                Object isAnomalyObj = response.get("is_anomaly");
-                boolean isAnomaly = isAnomalyObj instanceof Boolean ? (Boolean) isAnomalyObj : false;
+                result = new HashMap<>();
+                boolean isAnomaly = parseBoolean(response.get("is_anomaly"));
                 result.put("is_anomaly", isAnomaly);
-
-                Object scoreObj = response.get("anomaly_score");
-                result.put("anomaly_score", scoreObj instanceof Number ? ((Number) scoreObj).doubleValue() : 0.0);
-
-                Object confidenceObj = response.get("confidence");
-                result.put("confidence", confidenceObj instanceof Number ? ((Number) confidenceObj).doubleValue() : 0.0);
-
-                result.put("source", "python_model");
+                result.put("anomaly_score", asDouble(response.getOrDefault("anomaly_score", 0.0)));
+                result.put("confidence", asDouble(response.getOrDefault("confidence", 0.0)));
+                result.put("source", response.getOrDefault("source", "python_model"));
                 result.put("model_name", response.getOrDefault("model_name", "local_outlier_factor"));
                 result.put("severity", response.getOrDefault("severity", isAnomaly ? "LOW" : "NORMAL"));
                 result.put("reason", response.getOrDefault(
                         "reason",
-                        isAnomaly ? "Anomaly detected by the deployed LOF detector." : "Load behavior matches historical patterns."
+                        isAnomaly ? "Anomaly detected by the deployed detector." : "Load behavior matches historical patterns."
                 ));
-
-                System.out.println("🚨 Python Anomaly AI Result: " + result);
             } else {
                 result = ruleBased(predictedLoad, temperature, humidity, hour);
             }
-
         } catch (Exception e) {
-            System.out.println("Python service offline, using rule-based detection.");
             result = ruleBased(predictedLoad, temperature, humidity, hour);
         }
 
@@ -91,6 +102,27 @@ public class AnomalyDetectionService {
         return result;
     }
 
+    private boolean parseBoolean(Object value) {
+        if (value instanceof Boolean b) {
+            return b;
+        }
+        if (value instanceof Number n) {
+            return n.intValue() != 0;
+        }
+        if (value instanceof String s) {
+            String normalized = s.trim().toLowerCase(Locale.ROOT);
+            return normalized.equals("true") || normalized.equals("yes") || normalized.equals("1");
+        }
+        return false;
+    }
+
+    private double asDouble(Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        return 0.0;
+    }
+
     @Transactional
     public void clearAnomaliesForPrediction(Long predictionId) {
         if (predictionId != null) {
@@ -98,9 +130,6 @@ public class AnomalyDetectionService {
         }
     }
 
-    // =====================================================
-    // RULE-BASED FALLBACK (works without Python)
-    // =====================================================
     private Map<String, Object> ruleBased(double load, double temperature,
                                           double humidity, int hour) {
         Map<String, Object> result = new HashMap<>();
@@ -121,18 +150,18 @@ public class AnomalyDetectionService {
             isAnomaly = true;
             if (zScore >= 4.0) {
                 severity = "HIGH";
-                reason = String.format("Load (%.1f kW) is %.1fσ from hourly mean (%.1f kW). Critical.", load, zScore, mean);
+                reason = String.format(Locale.ROOT, "Load (%.1f kW) is %.1fσ from hourly mean (%.1f kW). Critical.", load, zScore, mean);
             } else if (zScore >= 3.0) {
                 severity = "MEDIUM";
-                reason = String.format("Load (%.1f kW) deviates %.1fσ from hourly average (%.1f kW).", load, zScore, mean);
+                reason = String.format(Locale.ROOT, "Load (%.1f kW) deviates %.1fσ from hourly average (%.1f kW).", load, zScore, mean);
             } else {
                 severity = "LOW";
-                reason = String.format("Mild anomaly: load (%.1f kW) is %.1fσ from mean (%.1f kW).", load, zScore, mean);
+                reason = String.format(Locale.ROOT, "Mild anomaly: load (%.1f kW) is %.1fσ from mean (%.1f kW).", load, zScore, mean);
             }
         } else if (temperature > 35 && load < mean * 0.7) {
             isAnomaly = true;
             severity = "MEDIUM";
-            reason = String.format("Low load (%.1f kW) during high temp (%.1f°C). Possible outage.", load, temperature);
+            reason = String.format(Locale.ROOT, "Low load (%.1f kW) during high temp (%.1f°C). Possible outage.", load, temperature);
             anomalyScore = 0.65;
         }
 
@@ -150,8 +179,23 @@ public class AnomalyDetectionService {
                              double load, double temperature, double humidity, int publicEvent,
                              int hour, int dayOfWeek, int month, Map<String, Object> result) {
         try {
-            Anomaly anomaly = new Anomaly();
+            ModelVersion modelVersion = modelVersionService.resolveCurrent(
+                    ModelVersionService.MODULE_ANOMALY,
+                    String.valueOf(result.getOrDefault("model_name", "anomaly_detector"))
+            );
+
+            LoadForecastRun loadForecastRun = loadService.getLoadForecastRunForRequest(predictionId);
+            Anomaly anomaly = loadForecastRun != null
+                    ? anomalyRepository.findFirstByLoadForecastRun_IdAndModelVersion_IdOrderByDetectedAtDesc(
+                                    loadForecastRun.getId(),
+                                    modelVersion.getId()
+                            )
+                            .orElseGet(Anomaly::new)
+                    : new Anomaly();
+
             anomaly.setPredictionId(predictionId);
+            anomaly.setLoadForecastRun(loadForecastRun);
+            anomaly.setModelVersion(modelVersion);
             anomaly.setTimestamp(forecastTimestamp != null ? forecastTimestamp : LocalDateTime.now());
             anomaly.setLoadDemand(load);
             anomaly.setTemperature(temperature);
@@ -160,11 +204,13 @@ public class AnomalyDetectionService {
             anomaly.setHourOfDay(hour);
             anomaly.setDayOfWeek(dayOfWeek);
             anomaly.setMonth(month);
-            anomaly.setAnomalyScore(((Number) result.getOrDefault("anomaly_score", 0.0)).doubleValue());
-            anomaly.setConfidence(((Number) result.getOrDefault("confidence", 0.0)).doubleValue());
-            anomaly.setSeverity((String) result.getOrDefault("severity", "LOW"));
-            anomaly.setReason((String) result.getOrDefault("reason", "Anomaly detected"));
+            anomaly.setAnomalyScore(asDouble(result.getOrDefault("anomaly_score", 0.0)));
+            anomaly.setConfidence(asDouble(result.getOrDefault("confidence", 0.0)));
+            anomaly.setSeverity(String.valueOf(result.getOrDefault("severity", "LOW")));
+            anomaly.setReason(String.valueOf(result.getOrDefault("reason", "Anomaly detected")));
             anomaly.setStatus("OPEN");
+            anomaly.setSource(String.valueOf(result.getOrDefault("source", "python_model")));
+            anomaly.setModelName(String.valueOf(result.getOrDefault("model_name", "anomaly_detector")));
             anomalyRepository.save(anomaly);
         } catch (Exception e) {
             System.err.println("Could not save anomaly record: " + e.getMessage());
@@ -180,9 +226,6 @@ public class AnomalyDetectionService {
         };
     }
 
-    // =====================================================
-    // SERVICE METHODS (used by AnomalyController for UI)
-    // =====================================================
     public List<Anomaly> getAllAnomalies() {
         return anomalyRepository.findAllByOrderByDetectedAtDesc();
     }
@@ -199,60 +242,109 @@ public class AnomalyDetectionService {
         return anomalyRepository.findById(id);
     }
 
+    @Transactional
     public Anomaly acknowledgeAnomaly(Long id) {
-        Anomaly a = anomalyRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Anomaly not found: " + id));
-        a.setStatus("ACKNOWLEDGED");
-        return anomalyRepository.save(a);
+        return acknowledgeAnomaly(id, null);
     }
 
-    public Anomaly resolveAnomaly(Long id, String note) {
-        Anomaly a = anomalyRepository.findById(id)
+    @Transactional
+    public Anomaly acknowledgeAnomaly(Long id, Integer userId) {
+        Anomaly anomaly = anomalyRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Anomaly not found: " + id));
-        a.setStatus("RESOLVED");
-        a.setResolutionNote(note);
-        a.setResolvedAt(LocalDateTime.now());
-        return anomalyRepository.save(a);
+        String oldStatus = anomaly.getStatus();
+        anomaly.setStatus("ACKNOWLEDGED");
+        anomaly.setAcknowledgedAt(LocalDateTime.now());
+        resolveUser(userId).ifPresent(anomaly::setAcknowledgedByUser);
+        Anomaly saved = anomalyRepository.save(anomaly);
+        createStatusEvent(saved, oldStatus, "ACKNOWLEDGED", "Acknowledged by operator.", userId);
+        return saved;
+    }
+
+    @Transactional
+    public Anomaly resolveAnomaly(Long id, String note) {
+        return resolveAnomaly(id, note, null);
+    }
+
+    @Transactional
+    public Anomaly resolveAnomaly(Long id, String note, Integer userId) {
+        Anomaly anomaly = anomalyRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Anomaly not found: " + id));
+        String oldStatus = anomaly.getStatus();
+        anomaly.setStatus("RESOLVED");
+        anomaly.setResolutionNote(note);
+        anomaly.setResolvedAt(LocalDateTime.now());
+        resolveUser(userId).ifPresent(anomaly::setResolvedByUser);
+        Anomaly saved = anomalyRepository.save(anomaly);
+        createStatusEvent(saved, oldStatus, "RESOLVED", note, userId);
+        return saved;
     }
 
     public Map<String, Object> getDashboardStats() {
         Map<String, Object> stats = new HashMap<>();
-        stats.put("totalAnomalies",  anomalyRepository.count());
-        stats.put("highCount",       anomalyRepository.countBySeverity("HIGH"));
-        stats.put("mediumCount",     anomalyRepository.countBySeverity("MEDIUM"));
-        stats.put("lowCount",        anomalyRepository.countBySeverity("LOW"));
-        stats.put("openCount",       anomalyRepository.countByStatus("OPEN"));
-        stats.put("resolvedCount",   anomalyRepository.countByStatus("RESOLVED"));
-        stats.put("todayCount",      anomalyRepository.countTodaysAnomalies());
+        stats.put("totalAnomalies", anomalyRepository.count());
+        stats.put("highCount", anomalyRepository.countBySeverity("HIGH"));
+        stats.put("mediumCount", anomalyRepository.countBySeverity("MEDIUM"));
+        stats.put("lowCount", anomalyRepository.countBySeverity("LOW"));
+        stats.put("openCount", anomalyRepository.countByStatus("OPEN"));
+        stats.put("resolvedCount", anomalyRepository.countByStatus("RESOLVED"));
+        stats.put("todayCount", anomalyRepository.countTodaysAnomalies());
         stats.put("recentAnomalies", anomalyRepository.findTop10ByOrderByDetectedAtDesc());
         return stats;
     }
 
-    // =====================================================
-    // FEEDBACK LOGGING (called from LoadController)
-    // =====================================================
     public void storeFeedback(Long predictionId, boolean agreed, boolean isAnomaly, double anomalyScore) {
+        Map<String, Object> feedback = new HashMap<>();
+        feedback.put("prediction_id", predictionId);
+        feedback.put("user_agreed", agreed);
+        feedback.put("is_anomaly", isAnomaly);
+        feedback.put("anomaly_score", anomalyScore);
+
+        // This relay is only a best-effort side log for the Python service.
+        // Run it off the request thread so UI feedback is not blocked on local HTTP latency.
+        CompletableFuture.runAsync(() -> postFeedbackToPython(feedback));
+    }
+
+    private void postFeedbackToPython(Map<String, Object> feedback) {
         try {
-            Map<String, Object> feedback = new HashMap<>();
-            feedback.put("prediction_id", predictionId);
-            feedback.put("user_agreed", agreed);
-            feedback.put("is_anomaly", isAnomaly);
-            feedback.put("anomaly_score", anomalyScore);
-            restTemplate.postForObject(anomalyServiceUrl + "/anomaly_feedback", feedback, Void.class);
+            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+            factory.setConnectTimeout(1500);
+            factory.setReadTimeout(1500);
+            RestTemplate feedbackRestTemplate = new RestTemplate(factory);
+            feedbackRestTemplate.postForObject(anomalyServiceUrl + "/anomaly_feedback", feedback, Void.class);
         } catch (Exception e) {
             System.out.println("Feedback log skipped (Python offline): " + e.getMessage());
         }
     }
 
-    // =====================================================
-    // PRIVATE HELPER
-    // =====================================================
+    private void createStatusEvent(Anomaly anomaly, String oldStatus, String newStatus, String note, Integer userId) {
+        resolveUser(userId).ifPresent(user -> {
+            AnomalyStatusEvent event = new AnomalyStatusEvent();
+            event.setAnomaly(anomaly);
+            event.setOldStatus(oldStatus == null ? "OPEN" : oldStatus);
+            event.setNewStatus(newStatus);
+            event.setNote(note);
+            event.setActedByUser(user);
+            anomalyStatusEventRepository.save(event);
+        });
+    }
+
+    private Optional<User> resolveUser(Integer userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+        return userRepository.findById(userId);
+    }
+
     private double[] getHourlyStats(List<LoadData> data, int hour) {
         List<Double> loads = new ArrayList<>();
         for (LoadData d : data) {
-            if (d.getHourOfDay() == hour) loads.add(d.getLoadDemand());
+            if (d.getHourOfDay() == hour) {
+                loads.add(d.getLoadDemand());
+            }
         }
-        if (loads.isEmpty()) return new double[]{3500.0, 800.0};
+        if (loads.isEmpty()) {
+            return new double[]{3500.0, 800.0};
+        }
 
         double mean = loads.stream().mapToDouble(Double::doubleValue).average().orElse(0);
         double variance = loads.stream().mapToDouble(v -> Math.pow(v - mean, 2)).average().orElse(0);

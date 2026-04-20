@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Cost Prediction', 'cost', ~{::content})}">
+<th:block th:fragment="content">
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb breadcrumb-custom">
+        <li class="breadcrumb-item"><a th:href="@{/home}"><i class="fas fa-home me-1"></i>Home</a></li>
+        <li class="breadcrumb-item active">Cost Prediction</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <h2 class="fw-bold mb-1">
+            <i class="fas fa-coins me-2" style="color:var(--cobalt);"></i>Cost Prediction
+        </h2>
+        <p class="text-muted mb-0">Predict unit electricity cost for a saved generation mix run.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a th:href="@{/generation-mix}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold">
+            <i class="fas fa-industry me-1"></i>Generation Mix
+        </a>
+    </div>
+</div>
+
+<div id="costAlert" class="alert alert-dismissible fade show border-0 shadow-sm mb-4" style="display:none;" role="alert">
+    <i id="costAlertIcon" class="me-2"></i>
+    <span id="costAlertText" style="white-space: pre-line;"></span>
+    <button type="button" class="btn-close" onclick="hideCostAlert()"></button>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="ui-card h-100">
+            <div class="card-header-custom px-4 py-3">
+                <h5 class="mb-0 fw-bold">
+                    <i class="fas fa-sliders-h me-2" style="color:var(--cobalt);"></i>Cost Inputs
+                </h5>
+            </div>
+            <div class="p-4">
+                <div class="mb-3">
+                    <label class="form-label">Setup <span class="text-danger">*</span></label>
+                    <div class="position-relative">
+                        <input id="runSearch" type="text" class="form-control" placeholder="Type setup id (e.g. 25)" autocomplete="off">
+                        <div id="runSuggestions" class="list-group position-absolute w-100 shadow-sm" style="z-index:1050; display:none;"></div>
+                    </div>
+                    <select id="runId" class="form-select d-none">
+                        <option value="">Select a setup...</option>
+                        <option th:each="run : ${runs}"
+                                th:value="${run.id}"
+                                th:attr="data-forecast=${run.forecastTimestamp},data-demand=${run.estimatedDailyDemandMwh},data-prediction=${run.loadRequestId},data-hydro=${run.majorHydroMwh},data-coal=${run.totalCoalMwh},data-thermal=${run.totalThermalMwh}"
+                                th:text="${'Setup #' + run.id + ' — ' + run.forecastTimestamp + ' — ' + run.estimatedDailyDemandMwh + ' MWh'}">
+                        </option>
+                    </select>
+                    <div class="form-text">Choose the saved setup you want to price. The summary below will show the key load demand and generation mix details.</div>
+                </div>
+
+                <div id="selectedSetupSummary" class="border rounded-4 p-3 mb-3" style="background:rgba(0,71,171,0.02);display:none;">
+                    <div class="small text-uppercase text-muted fw-semibold mb-3">Selected Forecast Summary</div>
+
+                    <div class="row g-3">
+                        <div class="col-12 col-sm-6">
+                            <div class="small text-muted text-uppercase">Forecast Date &amp; Time</div>
+                            <div id="setupForecastValue" class="fw-semibold text-body">--</div>
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <div class="small text-muted text-uppercase">Daily Demand</div>
+                            <div id="setupDemandValue" class="fw-semibold text-body">--</div>
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <div class="small text-muted text-uppercase">Major Hydro</div>
+                            <div id="setupHydroValue" class="fw-semibold text-body">--</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="small text-muted text-uppercase">Coal</div>
+                            <div id="setupCoalValue" class="fw-semibold text-body">--</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="small text-muted text-uppercase">Thermal</div>
+                            <div id="setupThermalValue" class="fw-semibold text-body">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <input id="editingCostRunId" type="hidden" value="">
+                <div id="editModeBanner" class="alert alert-warning py-2 px-3 small fw-semibold" style="display:none;">
+                    Editing saved cost entry <span id="editModeRunLabel">--</span>
+                </div>
+
+                <div class="row g-3 mb-2">
+                    <div class="col-12 col-md-6">
+                        <label for="foPrice" class="form-label">FO Price (LKR) <span class="text-danger">*</span></label>
+                        <input id="foPrice" type="number" class="form-control" step="0.01" min="0" placeholder="e.g. 450.00">
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label for="coalPrice" class="form-label">Coal Price (LKR) <span class="text-danger">*</span></label>
+                        <input id="coalPrice" type="number" class="form-control" step="0.01" min="0" placeholder="e.g. 300.00">
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label for="dieselPrice" class="form-label">Diesel Price (LKR) <span class="text-danger">*</span></label>
+                        <input id="dieselPrice" type="number" class="form-control" step="0.01" min="0" placeholder="e.g. 420.00">
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label for="naphthaPrice" class="form-label">Naphtha Price (LKR) <span class="text-danger">*</span></label>
+                        <input id="naphthaPrice" type="number" class="form-control" step="0.01" min="0" placeholder="e.g. 380.00">
+                    </div>
+                </div>
+
+                <div class="form-text mb-3">Enter values greater than 0 and not more than 100000.</div>
+
+                <div class="d-grid gap-2">
+                    <button id="predictCostBtn" type="button" class="btn-primary-custom w-100 py-2">
+                        <i class="fas fa-calculator me-2"></i><span id="predictCostBtnText">Predict Unit Cost</span>
+                    </button>
+                    <button id="cancelEditBtn" type="button" class="btn btn-outline-secondary w-100 py-2" style="display:none;">
+                        Cancel Edit
+                    </button>
+                </div>
+
+                <div id="costLoading" class="loading mt-4">
+                    <div class="spinner-border spinner-border-sm" style="color:var(--cobalt);" role="status"></div>
+                    <span class="ms-2 fw-semibold text-muted">Predicting cost...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div id="costEmpty" class="ui-card p-4 p-lg-5 text-center h-100">
+            <div class="empty-state py-5">
+                <i class="fas fa-coins"></i>
+                <p class="text-muted mb-1">Select a forecast setup and enter fuel prices to view the prediction.</p>
+                <p class="small text-muted mb-0">The result focuses on load demand, output cost, and recent trend analysis.</p>
+            </div>
+        </div>
+
+        <div id="costResult" style="display:none;">
+            <div class="row g-3 mb-4">
+                <div class="col-12">
+                    <div class="metric-card bg-cobalt-grad h-100">
+                        <div class="card-body text-center">
+                            <div class="small text-uppercase opacity-75 mb-2">Predicted Unit Cost</div>
+                            <div class="display-5 fw-bold"><span id="unitCostValue">--</span></div>
+                            <div class="small opacity-75">LKR per kWh</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-3 col-sm-6">
+                    <div class="ui-card h-100">
+                        <div class="p-3 text-center">
+                            <div class="small text-uppercase text-muted mb-2">Peak Cost</div>
+                            <div id="peakCostValue" class="h4 fw-bold mb-1">--</div>
+                            <div class="small text-muted">Last 7 days</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="ui-card h-100">
+                        <div class="p-3 text-center">
+                            <div class="small text-uppercase text-muted mb-2">Average Cost</div>
+                            <div id="avgCostValue" class="h4 fw-bold mb-1">--</div>
+                            <div class="small text-muted">Last 7 days</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="ui-card h-100">
+                        <div class="p-3 text-center">
+                            <div class="small text-uppercase text-muted mb-2">Latest Cost</div>
+                            <div id="latestCostValue" class="h4 fw-bold mb-1">--</div>
+                            <div class="small text-muted">Most recent run</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="ui-card h-100">
+                        <div class="p-3 text-center">
+                            <div class="small text-uppercase text-muted mb-2">Predictions</div>
+                            <div id="totalRunsValue" class="h4 fw-bold mb-1">--</div>
+                            <div class="small text-muted">Last 7 days</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ui-card">
+                <div class="card-header-custom px-4 py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-chart-line me-2" style="color:var(--cobalt);"></i>Cost Trend Line Chart
+                    </h5>
+                </div>
+                <div class="p-4">
+                    <div class="small text-muted mb-3">Showing all saved cost predictions in time order.</div>
+
+                    <div style="height:180px;">
+                        <canvas id="costTrendChart"></canvas>
+                    </div>
+                    <div class="small text-muted mt-3">Each dot is one saved cost prediction. The chart updates as you save more predictions.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="ui-card mt-4">
+    <div class="card-header-custom px-4 py-3">
+        <h5 class="mb-0 fw-bold">
+            <i class="fas fa-history me-2" style="color:var(--cobalt);"></i>Recent Cost Entries
+        </h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+            <tr>
+                <th>Entry</th>
+                <th>Setup</th>
+                <th>Timestamp</th>
+                <th>Unit Cost</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody id="savedCostRunsBody">
+            <tr th:if="${costRuns == null || costRuns.isEmpty()}" id="noCostRunsRow">
+                <td colspan="5" class="text-muted text-center py-4">No saved cost entries yet.</td>
+            </tr>
+            <tr th:each="cr : ${costRuns}">
+                <td class="fw-semibold" th:text="${cr.id}">--</td>
+                <td th:text="${'Setup #' + cr.generationMixResultId}">--</td>
+                <td th:text="${cr.forecastTimestamp}">--</td>
+                <td th:text="${#numbers.formatDecimal(cr.unitCost, 1, 2)}">--</td>
+                <td>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="button"
+                                class="btn btn-sm btn-outline-primary cost-edit-btn"
+                                th:attr="data-id=${cr.id},data-run-id=${cr.generationMixResultId},data-fo=${cr.foPrice},data-coal=${cr.coalPrice},data-diesel=${cr.dieselPrice},data-naphtha=${cr.naphthaPrice}">
+                            Update
+                        </button>
+                        <a class="btn btn-sm btn-outline-secondary"
+                           th:href="@{/api/reports/full-chain/export(costRunId=${cr.id})}" target="_blank" rel="noopener">
+                            Download Report
+                        </a>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-danger cost-delete-btn"
+                                th:attr="data-id=${cr.id}">
+                            Delete
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let costTrendChart = null;
+
+    function setFieldInvalid(id, invalid) {
+        const field = document.getElementById(id);
+        if (!field) {
+            return;
+        }
+        field.classList.toggle('is-invalid', invalid);
+    }
+
+    function clearValidationState() {
+        ['runId', 'foPrice', 'coalPrice', 'dieselPrice', 'naphthaPrice']
+            .forEach(id => setFieldInvalid(id, false));
+    }
+
+    function showCostAlert(type, message) {
+        const box = document.getElementById('costAlert');
+        const icon = document.getElementById('costAlertIcon');
+        document.getElementById('costAlertText').textContent = message;
+        const bsType = type === 'success' ? 'success' : (type === 'warning' ? 'warning' : 'danger');
+        box.className = 'alert alert-' + bsType +
+            ' alert-dismissible fade show border-0 shadow-sm mb-4';
+        const iconName = type === 'success'
+            ? 'check-circle'
+            : (type === 'warning' ? 'exclamation-triangle' : 'exclamation-circle');
+        icon.className = 'fas fa-' + iconName + ' me-2';
+        box.style.display = 'block';
+    }
+
+    function hideCostAlert() {
+        const box = document.getElementById('costAlert');
+        box.style.display = 'none';
+    }
+
+    function formatNumber(value) {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }) : '--';
+    }
+
+    function formatNumber0(value) {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric.toLocaleString(undefined, {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }) : '--';
+    }
+
+    function formatTimestamp(value) {
+        if (!value) {
+            return '--';
+        }
+        const date = new Date(String(value));
+        if (Number.isNaN(date.getTime())) {
+            return String(value);
+        }
+        return date.toLocaleString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    function formatPercent(value) {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? `${formatNumber(numeric)}%` : '--';
+    }
+
+    function parseJsonSafely(value) {
+        if (!value) {
+            return null;
+        }
+        try {
+            return JSON.parse(value);
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function updateSavedCostRow(savedId, validation, result) {
+        if (!savedId) {
+            return;
+        }
+        const editBtn = document.querySelector(`.cost-edit-btn[data-id="${savedId}"]`);
+        if (!editBtn) {
+            return;
+        }
+        editBtn.setAttribute('data-run-id', String(validation.runId));
+        editBtn.setAttribute('data-fo', String(validation.foPrice));
+        editBtn.setAttribute('data-coal', String(validation.coalPrice));
+        editBtn.setAttribute('data-diesel', String(validation.dieselPrice));
+        editBtn.setAttribute('data-naphtha', String(validation.naphthaPrice));
+
+        const row = editBtn.closest('tr');
+        const unitCostCell = row?.querySelector('td:nth-child(4)');
+        if (unitCostCell) {
+            unitCostCell.textContent = formatNumber(result?.unit_cost);
+        }
+    }
+
+    function insertSavedCostRow(savedId, validation, result) {
+        const body = document.getElementById('savedCostRunsBody');
+        if (!body || !savedId) {
+            return;
+        }
+        if (document.querySelector(`.cost-edit-btn[data-id="${savedId}"]`)) {
+            return;
+        }
+
+        const noRow = document.getElementById('noCostRunsRow');
+        if (noRow) {
+            noRow.remove();
+        }
+
+        const runOption = document.getElementById('runId')?.selectedOptions?.[0];
+        const ts = runOption?.getAttribute('data-forecast') || '';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="fw-semibold">${savedId}</td>
+            <td>Setup #${validation.runId}</td>
+            <td>${ts}</td>
+            <td>${formatNumber(result?.unit_cost)}</td>
+            <td>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-sm btn-outline-primary cost-edit-btn"
+                            data-id="${savedId}" data-run-id="${validation.runId}"
+                            data-fo="${validation.foPrice}" data-coal="${validation.coalPrice}"
+                            data-diesel="${validation.dieselPrice}" data-naphtha="${validation.naphthaPrice}">
+                        Update
+                    </button>
+                    <a class="btn btn-sm btn-outline-secondary" href="/api/reports/full-chain/export?costRunId=${savedId}" target="_blank" rel="noopener">
+                        Download Report
+                    </a>
+                    <button type="button" class="btn btn-sm btn-outline-danger cost-delete-btn" data-id="${savedId}">
+                        Delete
+                    </button>
+                </div>
+            </td>
+        `;
+
+        body.prepend(row);
+
+        const editBtn = row.querySelector('.cost-edit-btn');
+        if (editBtn) {
+            editBtn.addEventListener('click', () => enterEditMode(editBtn));
+        }
+        const deleteBtn = row.querySelector('.cost-delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => deleteCostRun(deleteBtn.getAttribute('data-id')));
+        }
+    }
+
+    function removeSavedCostRow(id) {
+        const deleteBtn = document.querySelector(`.cost-delete-btn[data-id="${id}"]`);
+        const row = deleteBtn?.closest('tr');
+        if (row) {
+            row.remove();
+        }
+    }
+
+    function updateSelectedSetupSummary() {
+        const select = document.getElementById('runId');
+        const option = select?.selectedOptions?.[0];
+        const summary = document.getElementById('selectedSetupSummary');
+        if (!option || !option.value) {
+            summary.style.display = 'none';
+            return;
+        }
+
+        summary.style.display = 'block';
+        document.getElementById('setupForecastValue').textContent = formatTimestamp(option.getAttribute('data-forecast'));
+        document.getElementById('setupDemandValue').textContent = `${formatNumber0(option.getAttribute('data-demand'))} MWh`;
+        document.getElementById('setupHydroValue').textContent = `${formatNumber0(option.getAttribute('data-hydro'))} MWh`;
+        document.getElementById('setupCoalValue').textContent = `${formatNumber0(option.getAttribute('data-coal'))} MWh`;
+        document.getElementById('setupThermalValue').textContent = `${formatNumber0(option.getAttribute('data-thermal'))} MWh`;
+    }
+
+    function loadExistingCostForSelectedSetup() {
+        const runId = document.getElementById('runId')?.value;
+        if (!runId) {
+            exitEditMode();
+            document.getElementById('costResult').style.display = 'none';
+            document.getElementById('costEmpty').style.display = 'block';
+            return;
+        }
+
+        const editBtn = document.querySelector(`.cost-edit-btn[data-run-id="${runId}"]`);
+        if (!editBtn) {
+            exitEditMode();
+            document.getElementById('foPrice').value = '';
+            document.getElementById('coalPrice').value = '';
+            document.getElementById('dieselPrice').value = '';
+            document.getElementById('naphthaPrice').value = '';
+            document.getElementById('costResult').style.display = 'none';
+            document.getElementById('costEmpty').style.display = 'block';
+            return;
+        }
+
+        exitEditMode();
+        document.getElementById('foPrice').value = editBtn.getAttribute('data-fo') || '';
+        document.getElementById('coalPrice').value = editBtn.getAttribute('data-coal') || '';
+        document.getElementById('dieselPrice').value = editBtn.getAttribute('data-diesel') || '';
+        document.getElementById('naphthaPrice').value = editBtn.getAttribute('data-naphtha') || '';
+        const row = editBtn.closest('tr');
+        const unitCostCell = row?.querySelector('td:nth-child(4)');
+        if (unitCostCell) {
+            document.getElementById('unitCostValue').textContent = unitCostCell.textContent || '--';
+            document.getElementById('costEmpty').style.display = 'none';
+            document.getElementById('costResult').style.display = 'block';
+        }
+    }
+
+    function validateFuelInputs() {
+        clearValidationState();
+
+        const runId = document.getElementById('runId').value;
+        const inputs = [
+            { id: 'foPrice', label: 'FO Price' },
+            { id: 'coalPrice', label: 'Coal Price' },
+            { id: 'dieselPrice', label: 'Diesel Price' },
+            { id: 'naphthaPrice', label: 'Naphtha Price' }
+        ];
+
+        if (!runId) {
+            setFieldInvalid('runId', true);
+            return { valid: false, message: 'Please select a forecast setup.' };
+        }
+
+        const values = {};
+        for (const input of inputs) {
+            const rawValue = document.getElementById(input.id).value;
+            const value = Number.parseFloat(rawValue);
+            if (rawValue === '' || !Number.isFinite(value)) {
+                setFieldInvalid(input.id, true);
+                return { valid: false, message: input.label + ' is required. Please enter a valid number.' };
+            }
+            if (value <= 0) {
+                setFieldInvalid(input.id, true);
+                return { valid: false, message: input.label + ' must be greater than 0.' };
+            }
+            if (value > 2000) {
+                setFieldInvalid(input.id, true);
+                return { valid: false, message: input.label + ' must not exceed 2000.' };
+            }
+            values[input.id] = value;
+        }
+
+        return {
+            valid: true,
+            runId: Number(runId),
+            foPrice: values.foPrice,
+            coalPrice: values.coalPrice,
+            dieselPrice: values.dieselPrice,
+            naphthaPrice: values.naphthaPrice
+        };
+    }
+
+    function enterEditMode(button) {
+        const costRunId = button.getAttribute('data-id');
+        const runId = button.getAttribute('data-run-id');
+        document.getElementById('editingCostRunId').value = costRunId || '';
+        document.getElementById('runId').value = runId || '';
+        document.getElementById('foPrice').value = button.getAttribute('data-fo') || '';
+        document.getElementById('coalPrice').value = button.getAttribute('data-coal') || '';
+        document.getElementById('dieselPrice').value = button.getAttribute('data-diesel') || '';
+        document.getElementById('naphthaPrice').value = button.getAttribute('data-naphtha') || '';
+        document.getElementById('editModeRunLabel').textContent = '#' + costRunId;
+        document.getElementById('editModeBanner').style.display = 'block';
+        document.getElementById('cancelEditBtn').style.display = 'block';
+        document.getElementById('predictCostBtnText').textContent = 'Update Cost Prediction';
+        updateSelectedSetupSummary();
+        clearValidationState();
+        hideCostAlert();
+    }
+
+    function exitEditMode() {
+        document.getElementById('editingCostRunId').value = '';
+        document.getElementById('editModeRunLabel').textContent = '--';
+        document.getElementById('editModeBanner').style.display = 'none';
+        document.getElementById('cancelEditBtn').style.display = 'none';
+        document.getElementById('predictCostBtnText').textContent = 'Predict Unit Cost';
+        clearValidationState();
+    }
+
+    function renderCostTrend(points) {
+        const labels = points.map(p => p.label);
+        const values = points.map(p => Number(p.unitCost));
+
+        if (costTrendChart) {
+            costTrendChart.destroy();
+        }
+
+        costTrendChart = new Chart(document.getElementById('costTrendChart').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Unit Cost (LKR/kWh)',
+                    data: values,
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.15)',
+                    pointBackgroundColor: '#0d6efd',
+                    pointRadius: points.length > 60 ? 2 : 4,
+                    tension: 0.25,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => {
+                                const idx = items?.[0]?.dataIndex;
+                                if (idx == null || !points?.[idx]) {
+                                    return items?.[0]?.label || '';
+                                }
+                                return points[idx].timestampLabel || items?.[0]?.label || '';
+                            },
+                            label: (item) => {
+                                const val = item?.parsed?.y;
+                                if (!Number.isFinite(val)) return 'Unit Cost: --';
+                                return `Unit Cost: ${formatNumber(val)} LKR/kWh`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: { beginAtZero: false, title: { display: true, text: 'LKR/kWh' } },
+                    x: {
+                        title: { display: true, text: 'Forecast Date' },
+                        ticks: {
+                            autoSkip: true,
+                            maxTicksLimit: 8
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function updateCostAnalysis(points) {
+        const peakCostValue = document.getElementById('peakCostValue');
+        const avgCostValue = document.getElementById('avgCostValue');
+        const latestCostValue = document.getElementById('latestCostValue');
+        const totalRunsValue = document.getElementById('totalRunsValue');
+
+        const latestPoint = points.length ? points[points.length - 1] : null;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const sevenDayStart = new Date(today);
+        sevenDayStart.setDate(sevenDayStart.getDate() - 6);
+
+        const recentPoints = points.filter(point => {
+            const d = new Date(point.dateIso + 'T00:00:00');
+            return d >= sevenDayStart && d <= today;
+        });
+
+        const peak = recentPoints.length ? Math.max(...recentPoints.map(point => point.unitCost)) : null;
+        const avg = recentPoints.length
+            ? recentPoints.reduce((sum, point) => sum + point.unitCost, 0) / recentPoints.length
+            : null;
+
+        peakCostValue.textContent = peak != null ? formatNumber(peak) : '--';
+        avgCostValue.textContent = avg != null ? formatNumber(avg) : '--';
+        latestCostValue.textContent = latestPoint ? formatNumber(latestPoint.unitCost) : '--';
+        totalRunsValue.textContent = recentPoints.length ? String(recentPoints.length) : '--';
+    }
+
+    async function loadCostHistory() {
+        try {
+            const response = await fetch('/api/cost/recent/points');
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to load cost history.');
+            }
+
+            const points = (data || [])
+                .filter(p => p && p.timestamp && p.unitCost != null)
+                .map(p => {
+                    const ts = new Date(p.timestamp);
+                    const isoDate = Number.isNaN(ts.getTime())
+                        ? null
+                        : ts.toISOString().substring(0, 10);
+                    return {
+                        dateIso: isoDate,
+                        label: isoDate || formatTimestamp(p.timestamp),
+                        timestampRaw: p.timestamp,
+                        timestampLabel: formatTimestamp(p.timestamp),
+                        unitCost: Number(p.unitCost)
+                    };
+                })
+                .filter(p => Number.isFinite(p.unitCost) && !!p.dateIso)
+                .sort((a, b) => a.dateIso.localeCompare(b.dateIso));
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const sevenDayStart = new Date(today);
+            sevenDayStart.setDate(sevenDayStart.getDate() - 6);
+
+            const lastSevenDaysPoints = points.filter(point => {
+                const d = new Date(point.dateIso + 'T00:00:00');
+                return d >= sevenDayStart && d <= today;
+            });
+
+            if (!points.length) {
+                showCostAlert('error', 'No saved cost entries were found yet.');
+            }
+
+            renderCostTrend(points);
+            updateCostAnalysis(lastSevenDaysPoints);
+        } catch (error) {
+            showCostAlert('error', error.message || 'Failed to load cost history.');
+        }
+    }
+
+    async function predictCost() {
+        hideCostAlert();
+
+        const validation = validateFuelInputs();
+        if (!validation.valid) {
+            showCostAlert('error', validation.message);
+            return;
+        }
+
+        const editingCostRunId = document.getElementById('editingCostRunId').value;
+        const isEditMode = !!editingCostRunId;
+
+        const button = document.getElementById('predictCostBtn');
+        document.getElementById('costLoading').style.display = 'block';
+        button.disabled = true;
+
+        try {
+            const response = await fetch(isEditMode ? `/api/cost/${encodeURIComponent(editingCostRunId)}` : '/api/cost/predict', {
+                method: isEditMode ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    runId: validation.runId,
+                    foPrice: validation.foPrice,
+                    coalPrice: validation.coalPrice,
+                    dieselPrice: validation.dieselPrice,
+                    naphthaPrice: validation.naphthaPrice
+                })
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.error || 'Cost prediction failed.');
+            }
+
+            document.getElementById('costEmpty').style.display = 'none';
+            document.getElementById('costResult').style.display = 'block';
+
+            document.getElementById('unitCostValue').textContent = formatNumber(result.unit_cost);
+
+            await loadCostHistory();
+            const savedId = isEditMode ? editingCostRunId : result.cost_run_id;
+            updateSavedCostRow(savedId, validation, result);
+            if (!isEditMode) {
+                insertSavedCostRow(savedId, validation, result);
+            }
+            const warnings = Array.isArray(result?.ml_warnings) ? result.ml_warnings : [];
+            if (result?.reused) {
+                const savedId = result.cost_run_id;
+                const overwrite = confirm(`A saved cost prediction already exists for these exact inputs (Entry #${savedId}).\n\nPress OK to overwrite (recompute) it, or Cancel to reuse it.`);
+                if (overwrite) {
+                    const retry = await fetch('/api/cost/predict', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            runId: validation.runId,
+                            foPrice: validation.foPrice,
+                            coalPrice: validation.coalPrice,
+                            dieselPrice: validation.dieselPrice,
+                            naphthaPrice: validation.naphthaPrice,
+                            forceNew: true
+                        })
+                    });
+                    const retryResult = await retry.json();
+                    if (!retry.ok) {
+                        throw new Error(retryResult.error || 'Cost prediction overwrite failed.');
+                    }
+
+                    document.getElementById('unitCostValue').textContent = formatNumber(retryResult.unit_cost);
+                    await loadCostHistory();
+                    updateSavedCostRow(savedId, validation, retryResult);
+                    showCostAlert('success', 'Saved cost prediction overwritten successfully for the same inputs.');
+                    return;
+                }
+
+                showCostAlert('success', `Saved cost prediction found (Entry #${savedId}). Reused existing result instead of creating a duplicate.`);
+            } else if (result?.overwritten) {
+                showCostAlert('success', 'Saved cost prediction overwritten successfully for the same inputs.');
+            } else if (warnings.length) {
+                const prefix = isEditMode
+                    ? 'Cost prediction updated with warnings: '
+                    : 'Cost prediction generated with warnings: ';
+
+                const parsed = warnings
+                    .map(w => String(w || ''))
+                    .map(line => {
+                        const match = line.match(/^(.+?)\s*\(([^)]+)\)\s+is outside training range\s+\(([^–\-]+)[–\-]([^)]+)\)\.?$/i);
+                        if (!match) {
+                            return null;
+                        }
+                        const label = match[1].trim();
+                        const value = match[2].trim();
+                        const min = match[3].trim();
+                        const max = match[4].trim();
+                        return { label, value, min, max };
+                    })
+                    .filter(Boolean);
+
+                if (parsed.length) {
+                    const uniqueLabels = Array.from(new Set(parsed.map(p => p.label)));
+                    const lines = parsed.map(p => `${p.label}: expected ${p.min}–${p.max}`);
+                    const message =
+                        prefix + 'Some prices are outside the expected range.\n\n' +
+                        'Predictions may be less accurate. Review the values below.\n' +
+                        lines.join('\n');
+                    showCostAlert('warning', message);
+                } else {
+                    const message = prefix + 'Some prices are outside the expected range. Predictions may be less accurate.';
+                    showCostAlert('warning', message);
+                }
+            } else {
+                showCostAlert('success', isEditMode ? 'Cost prediction updated successfully.' : 'Cost prediction generated successfully.');
+            }
+
+            if (result.trainingWarning) {
+                showCostAlert('warning', result.trainingWarning);
+            }
+            if (isEditMode) {
+                exitEditMode();
+            }
+        } catch (error) {
+            showCostAlert('error', error.message || 'Cost prediction failed.');
+        } finally {
+            document.getElementById('costLoading').style.display = 'none';
+            button.disabled = false;
+        }
+    }
+
+    async function deleteCostRun(id) {
+        hideCostAlert();
+        if (!id) {
+            showCostAlert('error', 'Cost run id is missing.');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/cost/${encodeURIComponent(id)}`, {
+                method: 'DELETE'
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to delete cost run.');
+            }
+
+            if (String(document.getElementById('editingCostRunId').value) === String(id)) {
+                exitEditMode();
+            }
+
+            removeSavedCostRow(id);
+
+            showCostAlert('success', 'Saved cost prediction deleted successfully.');
+        } catch (error) {
+            showCostAlert('error', error.message || 'Failed to delete cost run.');
+        }
+    }
+
+    const predictBtn = document.getElementById('predictCostBtn');
+    if (predictBtn) {
+        predictBtn.addEventListener('click', predictCost);
+    }
+
+    const cancelEditBtn = document.getElementById('cancelEditBtn');
+    if (cancelEditBtn) {
+        cancelEditBtn.addEventListener('click', exitEditMode);
+    }
+
+    const runSelect = document.getElementById('runId');
+    const runSearch = document.getElementById('runSearch');
+    const runSuggestions = document.getElementById('runSuggestions');
+    let allRunOptions = [];
+
+    function snapshotRunOptions() {
+        if (!runSelect) return;
+        allRunOptions = [];
+        for (const opt of Array.from(runSelect.options)) {
+            if (!opt.value) continue;
+            allRunOptions.push({
+                value: opt.value,
+                text: opt.text
+            });
+        }
+    }
+
+    function parseSetupIdQuery(q) {
+        const trimmed = (q || '').trim();
+        if (!trimmed) return null;
+        if (/^\d+$/.test(trimmed)) return trimmed;
+        const m = trimmed.match(/setup\s*#?\s*(\d+)/i);
+        return m ? m[1] : null;
+    }
+
+    function findMatches(q) {
+        const query = (q || '').trim().toLowerCase();
+        if (!query) return [];
+
+        const digitsOnly = /^\d+$/.test(query);
+
+        const idQuery = parseSetupIdQuery(query);
+
+        if (digitsOnly) {
+            return allRunOptions
+                    .filter(o => String(o.value).startsWith(String(idQuery)))
+                    .slice(0, 8);
+        }
+
+        let matches = allRunOptions.filter(o => (o.text || '').toLowerCase().includes(query));
+        if (idQuery) {
+            const idMatches = allRunOptions.filter(o => String(o.value) === String(idQuery));
+            matches = [...idMatches, ...matches.filter(m => String(m.value) !== String(idQuery))];
+        }
+
+        return matches.slice(0, 8);
+    }
+
+    function hideSuggestions() {
+        if (runSuggestions) {
+            runSuggestions.style.display = 'none';
+            runSuggestions.innerHTML = '';
+        }
+    }
+
+    function selectRunOptionByValue(value) {
+        if (!runSelect || !value) return false;
+        const normalized = String(value);
+        const exists = Array.from(runSelect.options).some(opt => String(opt.value) === normalized);
+        if (!exists) return false;
+
+        runSelect.value = normalized;
+        runSelect.dispatchEvent(new Event('change'));
+        hideSuggestions();
+        return true;
+    }
+
+    function commitRunSearchValue() {
+        if (!runSearch) return false;
+        const parsedId = parseSetupIdQuery(runSearch.value);
+        if (!parsedId) return false;
+
+        if (selectRunOptionByValue(parsedId)) {
+            return true;
+        }
+
+        const prefixMatches = allRunOptions.filter(o => String(o.value).startsWith(String(parsedId)));
+        if (prefixMatches.length === 1) {
+            return selectRunOptionByValue(prefixMatches[0].value);
+        }
+
+        return false;
+    }
+
+    function showSuggestions(list) {
+        if (!runSuggestions) return;
+        runSuggestions.innerHTML = '';
+
+        if (!list.length) {
+            hideSuggestions();
+            return;
+        }
+
+        for (const item of list) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'list-group-item list-group-item-action';
+            btn.textContent = item.text;
+            btn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                selectRunOptionByValue(item.value);
+            });
+            btn.addEventListener('click', () => {
+                selectRunOptionByValue(item.value);
+            });
+            runSuggestions.appendChild(btn);
+        }
+
+        runSuggestions.style.display = 'block';
+    }
+
+    if (runSelect) {
+        runSelect.addEventListener('change', () => {
+            updateSelectedSetupSummary();
+            loadExistingCostForSelectedSetup();
+
+            const option = runSelect?.selectedOptions?.[0];
+            const selectedId = option?.value;
+            if (runSearch && selectedId) {
+                runSearch.value = `Setup #${selectedId}`;
+            }
+        });
+    }
+
+    if (runSelect) {
+        snapshotRunOptions();
+    }
+
+    if (runSearch) {
+        runSearch.addEventListener('input', () => {
+            const matches = findMatches(runSearch.value);
+            showSuggestions(matches);
+        });
+        runSearch.addEventListener('focus', () => {
+            const matches = findMatches(runSearch.value);
+            showSuggestions(matches);
+        });
+        runSearch.addEventListener('blur', () => {
+            setTimeout(() => {
+                commitRunSearchValue();
+                hideSuggestions();
+            }, 150);
+        });
+        runSearch.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                hideSuggestions();
+                return;
+            }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (!commitRunSearchValue()) {
+                    hideSuggestions();
+                }
+            }
+        });
+    }
+
+    document.querySelectorAll('.cost-edit-btn').forEach(button => {
+        button.addEventListener('click', () => enterEditMode(button));
+    });
+
+    document.querySelectorAll('.cost-delete-btn').forEach(button => {
+        button.addEventListener('click', () => deleteCostRun(button.getAttribute('data-id')));
+    });
+
+    updateSelectedSetupSummary();
+    loadExistingCostForSelectedSetup();
+    loadCostHistory();
+</script>
+
+</th:block>
+</html>

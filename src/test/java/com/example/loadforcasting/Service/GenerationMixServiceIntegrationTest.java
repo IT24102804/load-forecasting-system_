@@ -1,12 +1,20 @@
 package com.example.loadforcasting.Service;
 
+import com.example.loadforcasting.Entity.GenerationMixRun;
+import com.example.loadforcasting.Entity.GenerationMixRequestEntity;
+import com.example.loadforcasting.Entity.LoadForecastRun;
 import com.example.loadforcasting.Entity.LoadRequest;
+import com.example.loadforcasting.Entity.ModelVersion;
+import com.example.loadforcasting.Repository.GenerationMixRequestRepository;
+import com.example.loadforcasting.Repository.GenerationMixRunRepository;
+import com.example.loadforcasting.Repository.LoadForecastRunRepository;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -16,17 +24,39 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class GenerationMixServiceIntegrationTest {
 
     @InjectMocks
     private GenerationMixService generationMixService;
+
+    @Mock
+    private LoadService loadService;
+
+    @Mock
+    private GenerationMixRunRepository generationMixRunRepository;
+
+    @Mock
+    private LoadForecastRunRepository loadForecastRunRepository;
+
+    @Mock
+    private GenerationMixRequestRepository generationMixRequestRepository;
+
+    @Mock
+    private PredictionSignatureService predictionSignatureService;
+
+    @Mock
+    private ModelVersionService modelVersionService;
 
     private HttpServer server;
 
@@ -40,6 +70,7 @@ class GenerationMixServiceIntegrationTest {
 
     @Test
     void predictGenerationMix_UsesDerivedDailyDemandAndMapsSuccessResponse() throws Exception {
+        stubCanonicalDependencies(60L, 72.5);
         AtomicReference<String> requestBody = new AtomicReference<>("");
         String url = startServer("""
                 {
@@ -69,6 +100,20 @@ class GenerationMixServiceIntegrationTest {
                 }
                 """, 200, requestBody);
         ReflectionTestUtils.setField(generationMixService, "generationMixServiceUrl", url);
+        when(generationMixRunRepository.save(any(GenerationMixRun.class)))
+                .thenAnswer(invocation -> {
+                    GenerationMixRun saved = invocation.getArgument(0);
+                    saved.setId(501L);
+                    return saved;
+                });
+
+        when(loadService.predictValue(any(LoadRequest.class))).thenReturn(1205.842041015625);
+        when(loadService.getLoadForecastRunForRequest(60L)).thenAnswer(invocation -> {
+            LoadForecastRun run = new LoadForecastRun();
+            run.setId(88L);
+            run.setEstimatedDailyDemandMwh(0.0);
+            return run;
+        });
 
         LoadRequest request = new LoadRequest();
         request.setId(60L);
@@ -88,12 +133,21 @@ class GenerationMixServiceIntegrationTest {
 
     @Test
     void predictGenerationMix_FlaskValidationError_ReturnsControlledMessage() throws Exception {
+        stubCanonicalDependencies(61L, 75.0);
         String url = startServer("""
                 {
                   "error": "Load Demand must be at least 20000 MWh!"
                 }
                 """, 400, new AtomicReference<>(""));
         ReflectionTestUtils.setField(generationMixService, "generationMixServiceUrl", url);
+
+        when(loadService.predictValue(any(LoadRequest.class))).thenReturn(100.0);
+        when(loadService.getLoadForecastRunForRequest(61L)).thenAnswer(invocation -> {
+            LoadForecastRun run = new LoadForecastRun();
+            run.setId(89L);
+            run.setEstimatedDailyDemandMwh(0.0);
+            return run;
+        });
 
         LoadRequest request = new LoadRequest();
         request.setId(61L);
@@ -122,5 +176,25 @@ class GenerationMixServiceIntegrationTest {
         try (OutputStream outputStream = exchange.getResponseBody()) {
             outputStream.write(responseBytes);
         }
+    }
+
+    private void stubCanonicalDependencies(Long loadForecastRunId, double reservoirPct) {
+        ModelVersion modelVersion = new ModelVersion();
+        modelVersion.setId(1L);
+        modelVersion.setVersionLabel("v1");
+        modelVersion.setModelName("generation_mix_ai");
+
+        when(predictionSignatureService.buildGenerationMixScenarioSignature(loadForecastRunId == 60L ? 88L : 89L, reservoirPct))
+                .thenReturn("mix-signature-" + loadForecastRunId);
+        when(generationMixRequestRepository.findByScenarioSignature("mix-signature-" + loadForecastRunId)).thenReturn(Optional.empty());
+        when(generationMixRequestRepository.save(any(GenerationMixRequestEntity.class))).thenAnswer(invocation -> {
+            GenerationMixRequestEntity saved = invocation.getArgument(0);
+            saved.setId(300L);
+            return saved;
+        });
+        when(modelVersionService.resolveCurrent(anyString(), anyString())).thenReturn(modelVersion);
+        when(generationMixRunRepository.findFirstByGenerationMixRequestAndModelVersionOrderByCreatedAtDesc(any(GenerationMixRequestEntity.class), any(ModelVersion.class)))
+                .thenReturn(Optional.empty());
+        when(loadForecastRunRepository.save(any(LoadForecastRun.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 }

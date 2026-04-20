@@ -28,6 +28,7 @@ body {
     font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     color: var(--navy);
     margin: 0;
+    font-size: 0.95rem;
 }
 
 /* ---------- Navbar ---------- */
@@ -120,6 +121,14 @@ body {
     box-shadow: var(--shadow-md);
     overflow: hidden;
 }
+
+.ui-card .p-4 {
+    padding: 1.25rem !important;
+}
+
+.ui-card .p-5 {
+    padding: 2rem !important;
+}
 .card-header-custom {
     background-color: rgba(130, 200, 229, 0.1);
     border-bottom: 1px solid rgba(109, 129, 150, 0.1);
@@ -149,6 +158,7 @@ body {
 }
 .metric-card:hover { transform: translateY(-5px); }
 .metric-card .card-body { padding: 1.5rem; position: relative; z-index: 2; }
+.metric-card .card-body { padding: 1.15rem; }
 .metric-card .icon-bg {
     position: absolute;
     right: -10px;

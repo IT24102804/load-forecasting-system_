@@ -1,6 +1,11 @@
 package com.example.loadforcasting.Service;
 
 import com.example.loadforcasting.Entity.LoadRequest;
+import com.example.loadforcasting.Entity.LoadForecast;
+import com.example.loadforcasting.Entity.LoadForecastRun;
+import com.example.loadforcasting.Entity.ModelVersion;
+import com.example.loadforcasting.Repository.LoadForecastRepository;
+import com.example.loadforcasting.Repository.LoadForecastRunRepository;
 import com.example.loadforcasting.Repository.LoadRepository;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -17,12 +22,16 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,6 +40,18 @@ class LoadServiceIntegrationTest {
 
     @Mock
     private LoadRepository loadRepository;
+
+    @Mock
+    private LoadForecastRepository loadForecastRepository;
+
+    @Mock
+    private LoadForecastRunRepository loadForecastRunRepository;
+
+    @Mock
+    private PredictionSignatureService predictionSignatureService;
+
+    @Mock
+    private ModelVersionService modelVersionService;
 
     @InjectMocks
     private LoadService loadService;
@@ -47,6 +68,7 @@ class LoadServiceIntegrationTest {
 
     @Test
     void predictAndSave_PythonSuccess_SendsExpectedPayloadAndPersistsPrediction() throws Exception {
+        stubCanonicalDependencies();
         AtomicReference<String> requestBody = new AtomicReference<>("");
         String url = startServer("""
                 {
@@ -80,6 +102,7 @@ class LoadServiceIntegrationTest {
 
     @Test
     void predictAndSave_InvalidPythonResponse_UsesFallbackAndPersistsPrediction() throws Exception {
+        stubCanonicalDependencies();
         String url = startServer("""
                 {
                   "unexpected": 1
@@ -123,5 +146,29 @@ class LoadServiceIntegrationTest {
         try (OutputStream outputStream = exchange.getResponseBody()) {
             outputStream.write(responseBytes);
         }
+    }
+
+    private void stubCanonicalDependencies() {
+        ModelVersion modelVersion = new ModelVersion();
+        modelVersion.setId(1L);
+        modelVersion.setVersionLabel("v1");
+        modelVersion.setModelName("load_ai_predictor");
+
+        when(predictionSignatureService.buildLoadSignature(any(LocalDateTime.class), anyDouble(), anyDouble(), anyInt()))
+                .thenReturn("load-signature");
+        when(modelVersionService.resolveCurrent(anyString(), anyString())).thenReturn(modelVersion);
+        when(loadForecastRepository.findByInputSignature("load-signature")).thenReturn(Optional.empty());
+        when(loadForecastRepository.save(any(LoadForecast.class))).thenAnswer(invocation -> {
+            LoadForecast saved = invocation.getArgument(0);
+            saved.setId(100L);
+            return saved;
+        });
+        when(loadForecastRunRepository.findFirstByLoadForecastAndModelVersionOrderByCreatedAtDesc(any(LoadForecast.class), any(ModelVersion.class)))
+                .thenReturn(Optional.empty());
+        when(loadForecastRunRepository.save(any(LoadForecastRun.class))).thenAnswer(invocation -> {
+            LoadForecastRun saved = invocation.getArgument(0);
+            saved.setId(200L);
+            return saved;
+        });
     }
 }

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface AnomalyRepository extends JpaRepository<Anomaly, Long> {
@@ -36,4 +37,10 @@ public interface AnomalyRepository extends JpaRepository<Anomaly, Long> {
     // Stats query
     @Query("SELECT COUNT(a) FROM Anomaly a WHERE a.detectedAt >= CURRENT_DATE")
     long countTodaysAnomalies();
+
+    Optional<Anomaly> findFirstByLoadForecastRun_IdAndModelVersion_IdOrderByDetectedAtDesc(Long loadForecastRunId, Long modelVersionId);
+
+    Optional<Anomaly> findFirstByLoadForecastRun_IdOrderByDetectedAtDesc(Long loadForecastRunId);
+
+    Optional<Anomaly> findFirstByPredictionIdOrderByDetectedAtDesc(Long predictionId);
 }

@@ -40,6 +40,16 @@
 
         <div class="card-body p-4 p-md-5">
             <form id="submissionForm" th:action="@{/feedback/submit}" th:object="${feedback}" method="post" novalidate>
+                <input type="hidden" th:field="*{predictionId}">
+                <input type="hidden" name="anomalyId" th:value="${prefillAnomalyId}">
+
+                <div th:if="${anomalyContext}" class="alert alert-info border-0 shadow-sm rounded-3 mb-4">
+                    <div class="fw-semibold mb-1"><i class="fas fa-bell me-2"></i>Detailed anomaly feedback</div>
+                    <div class="small mb-0">
+                        <span th:text="'Prediction #' + ${contextPredictionId}">Prediction context</span>
+                        <span th:if="${contextAnomalyId != null}" th:text="' | Anomaly #' + ${contextAnomalyId}">Anomaly context</span>
+                    </div>
+                </div>
 
                 <div class="row">
                     <div class="col-md-6 mb-4">
@@ -61,7 +71,13 @@
                     </div>
                 </div>
 
-                <div class="mb-4">
+                <div class="mb-4" th:if="${anomalyContext}">
+                    <label class="form-label">Category</label>
+                    <input type="text" class="form-control" value="ANOMALY FEEDBACK" disabled>
+                    <input type="hidden" th:field="*{feedbackType}">
+                </div>
+
+                <div class="mb-4" th:unless="${anomalyContext}">
                     <label for="feedbackType" class="form-label">Category <span class="text-danger">*</span></label>
                     <select class="form-select" id="feedbackType" th:field="*{feedbackType}" required>
                         <option value="">-- Select Classification --</option>
@@ -95,7 +111,7 @@
                 <div class="mb-4">
                     <label for="message" class="form-label">Detailed Description <span class="text-danger">*</span></label>
                     <textarea class="form-control" id="message" rows="5" th:field="*{message}" required
-                              placeholder="Describe the issue, anomaly, or suggestion in detail..."></textarea>
+                              th:attr="placeholder=${messageHint}"></textarea>
                     <div class="invalid-feedback">Please provide a description of your feedback.</div>
                 </div>
 

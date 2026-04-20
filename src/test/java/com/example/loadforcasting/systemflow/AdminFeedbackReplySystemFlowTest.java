@@ -28,12 +28,13 @@ class AdminFeedbackReplySystemFlowTest extends AbstractSystemFlowTest {
         feedback.setCreatedAt(LocalDateTime.of(2026, 4, 13, 10, 0));
         Feedback saved = feedbackRepository.save(feedback);
 
-        mockMvc.perform(get("/api/admin/feedback"))
+        mockMvc.perform(get("/api/admin/feedback").session(adminSession()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(saved.getId()))
                 .andExpect(jsonPath("$[0].status").value("PENDING"));
 
         mockMvc.perform(put("/api/admin/feedback/" + saved.getId())
+                        .session(adminSession())
                         .contentType(APPLICATION_JSON)
                         .content("""
                                 {

@@ -16,6 +16,7 @@ import java.util.Optional;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -50,6 +51,20 @@ class FeedbackControllerWebTest {
     }
 
     @Test
+    void showSubmitForm_WithAnomalyContext_PrefillsModel() throws Exception {
+        mockMvc.perform(get("/feedback/submit")
+                        .param("predictionId", "43")
+                        .param("anomalyId", "5")
+                        .param("feedbackType", "ANOMALY_FEEDBACK"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("feedback/submit"))
+                .andExpect(model().attribute("anomalyContext", true))
+                .andExpect(model().attribute("contextPredictionId", 43L))
+                .andExpect(model().attribute("contextAnomalyId", 5L))
+                .andExpect(model().attributeExists("feedback", "feedbackTypes"));
+    }
+
+    @Test
     void submitFeedback_InvalidEmail_RedirectsBackWithFlashError() throws Exception {
         mockMvc.perform(post("/feedback/submit")
                         .param("userName", "Test User")
@@ -58,6 +73,22 @@ class FeedbackControllerWebTest {
                         .param("message", "This is a test message"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/feedback/submit"))
+                .andExpect(flash().attributeExists("errorMessage"));
+
+        verify(feedbackService, never()).saveFeedback(any());
+    }
+
+    @Test
+    void submitFeedback_InvalidEmailWithAnomalyContext_RedirectsBackWithContext() throws Exception {
+        mockMvc.perform(post("/feedback/submit")
+                        .param("predictionId", "43")
+                        .param("anomalyId", "5")
+                        .param("userName", "Test User")
+                        .param("userEmail", "invalid-email")
+                        .param("message", "Needs review")
+                        .param("feedbackType", "GENERAL"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/feedback/submit?predictionId=43&feedbackType=ANOMALY_FEEDBACK&anomalyId=5"))
                 .andExpect(flash().attributeExists("errorMessage"));
 
         verify(feedbackService, never()).saveFeedback(any());
@@ -82,6 +113,30 @@ class FeedbackControllerWebTest {
                 .andExpect(flash().attributeExists("successMessage"));
 
         verify(feedbackService).saveFeedback(any(Feedback.class));
+    }
+
+    @Test
+    void submitFeedback_WithPredictionContext_ForcesAnomalyFeedback() throws Exception {
+        Feedback saved = new Feedback();
+        saved.setId(13L);
+        saved.setUserEmail("test@example.com");
+
+        when(feedbackService.saveFeedback(any(Feedback.class))).thenReturn(saved);
+
+        mockMvc.perform(post("/feedback/submit")
+                        .param("predictionId", "43")
+                        .param("userName", "Test User")
+                        .param("userEmail", "test@example.com")
+                        .param("feedbackType", "GENERAL")
+                        .param("message", "Detailed anomaly note"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/feedback/my-feedback?email=test@example.com"))
+                .andExpect(flash().attributeExists("successMessage"));
+
+        verify(feedbackService).saveFeedback(argThat(feedback ->
+                feedback.getPredictionId() != null
+                        && feedback.getPredictionId().equals(43L)
+                        && feedback.getFeedbackType() == FeedbackType.ANOMALY_FEEDBACK));
     }
 
     @Test

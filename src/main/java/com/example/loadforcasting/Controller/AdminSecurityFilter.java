@@ -24,7 +24,7 @@ public class AdminSecurityFilter implements Filter {
         String requestURI = req.getRequestURI();
 
         // 1. Check if the user is trying to access ANY file inside the /admin/ folder
-        if (requestURI.startsWith("/admin/")) {
+        if (requestURI.startsWith("/admin/") || requestURI.startsWith("/api/admin/")) {
             boolean isAuthorized = false;
 
             // 2. Check if they have an active session AND their role is Admin

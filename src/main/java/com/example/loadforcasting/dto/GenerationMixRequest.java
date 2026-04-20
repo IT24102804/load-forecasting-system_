@@ -4,6 +4,7 @@ public class GenerationMixRequest {
 
     private Long predictionId;
     private Double reservoirPct;
+    private Boolean forceNew;
 
     public Long getPredictionId() {
         return predictionId;
@@ -19,5 +20,13 @@ public class GenerationMixRequest {
 
     public void setReservoirPct(Double reservoirPct) {
         this.reservoirPct = reservoirPct;
+    }
+
+    public Boolean getForceNew() {
+        return forceNew;
+    }
+
+    public void setForceNew(Boolean forceNew) {
+        this.forceNew = forceNew;
     }
 }

@@ -173,7 +173,7 @@ public class AnomalyControllerTest {
 
     @Test
     void acknowledge_ValidAnomaly_RedirectsToDetail() {
-        when(anomalyService.acknowledgeAnomaly(1L)).thenReturn(sampleAnomaly);
+        when(anomalyService.acknowledgeAnomaly(1L, 1)).thenReturn(sampleAnomaly);
 
         String view = anomalyController.acknowledge(1L, loggedInSession, redirectAttributes);
 
@@ -183,7 +183,7 @@ public class AnomalyControllerTest {
 
     @Test
     void acknowledge_ServiceThrowsException_RedirectsWithError() {
-        when(anomalyService.acknowledgeAnomaly(99L))
+        when(anomalyService.acknowledgeAnomaly(99L, 1))
             .thenThrow(new RuntimeException("Anomaly not found: 99"));
 
         String view = anomalyController.acknowledge(99L, loggedInSession, redirectAttributes);
@@ -197,14 +197,14 @@ public class AnomalyControllerTest {
         String view = anomalyController.acknowledge(1L, loggedOutSession, redirectAttributes);
 
         assertEquals("redirect:/", view);
-        verify(anomalyService, never()).acknowledgeAnomaly(any());
+        verify(anomalyService, never()).acknowledgeAnomaly(any(), any());
     }
 
     // ===== RESOLVE TESTS =====
 
     @Test
     void resolve_ValidAnomalyWithNote_RedirectsToDetail() {
-        when(anomalyService.resolveAnomaly(1L, "Sensor recalibrated."))
+        when(anomalyService.resolveAnomaly(1L, "Sensor recalibrated.", 1))
             .thenReturn(sampleAnomaly);
 
         String view = anomalyController.resolve(
@@ -216,30 +216,30 @@ public class AnomalyControllerTest {
 
     @Test
     void resolve_EmptyNote_UsesDefaultNote() {
-        when(anomalyService.resolveAnomaly(eq(1L), anyString())).thenReturn(sampleAnomaly);
+        when(anomalyService.resolveAnomaly(eq(1L), anyString(), eq(1))).thenReturn(sampleAnomaly);
 
         String view = anomalyController.resolve(
             1L, "", loggedInSession, redirectAttributes);
 
         assertEquals("redirect:/anomaly/1", view);
         // Verify it was called with the default note instead of empty string
-        verify(anomalyService).resolveAnomaly(eq(1L), eq("Resolved by operator."));
+        verify(anomalyService).resolveAnomaly(eq(1L), eq("Resolved by operator."), eq(1));
     }
 
     @Test
     void resolve_NullNote_UsesDefaultNote() {
-        when(anomalyService.resolveAnomaly(eq(1L), anyString())).thenReturn(sampleAnomaly);
+        when(anomalyService.resolveAnomaly(eq(1L), anyString(), eq(1))).thenReturn(sampleAnomaly);
 
         String view = anomalyController.resolve(
             1L, null, loggedInSession, redirectAttributes);
 
         assertEquals("redirect:/anomaly/1", view);
-        verify(anomalyService).resolveAnomaly(eq(1L), eq("Resolved by operator."));
+        verify(anomalyService).resolveAnomaly(eq(1L), eq("Resolved by operator."), eq(1));
     }
 
     @Test
     void resolve_ServiceThrowsException_RedirectsWithError() {
-        when(anomalyService.resolveAnomaly(anyLong(), anyString()))
+        when(anomalyService.resolveAnomaly(anyLong(), anyString(), eq(1)))
             .thenThrow(new RuntimeException("Not found"));
 
         String view = anomalyController.resolve(
@@ -255,6 +255,6 @@ public class AnomalyControllerTest {
             1L, "Some note", loggedOutSession, redirectAttributes);
 
         assertEquals("redirect:/", view);
-        verify(anomalyService, never()).resolveAnomaly(any(), any());
+        verify(anomalyService, never()).resolveAnomaly(any(), any(), any());
     }
 }

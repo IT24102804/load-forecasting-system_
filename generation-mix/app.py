@@ -6,6 +6,7 @@ app = Flask(__name__)
 app.register_blueprint(generation_bp)
 
 
+@app.route("/app-health")
 @app.route("/health")
 def health():
     return jsonify({"status": "ok", "service": "generation-mix"})

@@ -1,6 +1,11 @@
 package com.example.loadforcasting.Service;
 
 import com.example.loadforcasting.Entity.WeatherPrediction;
+import com.example.loadforcasting.Entity.ModelVersion;
+import com.example.loadforcasting.Entity.WeatherForecast;
+import com.example.loadforcasting.Entity.WeatherForecastRun;
+import com.example.loadforcasting.Repository.WeatherForecastRepository;
+import com.example.loadforcasting.Repository.WeatherForecastRunRepository;
 import com.example.loadforcasting.Repository.WeatherPredictionRepository;
 import com.example.loadforcasting.dto.WeatherPredictionResult;
 import com.sun.net.httpserver.HttpExchange;
@@ -18,6 +23,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -26,6 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,6 +43,15 @@ class WeatherPredictionServiceIntegrationTest {
 
     @Mock
     private WeatherPredictionRepository repository;
+
+    @Mock
+    private WeatherForecastRepository weatherForecastRepository;
+
+    @Mock
+    private WeatherForecastRunRepository weatherForecastRunRepository;
+
+    @Mock
+    private ModelVersionService modelVersionService;
 
     @InjectMocks
     private WeatherPredictionService service;
@@ -96,6 +113,7 @@ class WeatherPredictionServiceIntegrationTest {
 
     @Test
     void predictAndSave_PythonSuccess_MapsAllWeatherFieldsAndPersists() throws Exception {
+        stubCanonicalDependencies();
         AtomicReference<String> requestBody = new AtomicReference<>("");
         String url = startServer("""
                 {
@@ -135,6 +153,7 @@ class WeatherPredictionServiceIntegrationTest {
 
     @Test
     void updatePrediction_PythonSuccess_UpdatesExistingRecord() throws Exception {
+        stubCanonicalDependencies();
         AtomicReference<String> requestBody = new AtomicReference<>("");
         String url = startServer("""
                 {
@@ -169,6 +188,7 @@ class WeatherPredictionServiceIntegrationTest {
 
     @Test
     void predictAndSave_PythonOffline_UsesFallbackRangesAndPersists() {
+        stubCanonicalDependencies();
         ReflectionTestUtils.setField(service, "PYTHON_API_URL", "http://localhost:1/predict");
 
         when(repository.save(any(WeatherPrediction.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -202,5 +222,27 @@ class WeatherPredictionServiceIntegrationTest {
         try (OutputStream outputStream = exchange.getResponseBody()) {
             outputStream.write(responseBytes);
         }
+    }
+
+    private void stubCanonicalDependencies() {
+        ModelVersion modelVersion = new ModelVersion();
+        modelVersion.setId(1L);
+        modelVersion.setVersionLabel("v1");
+        modelVersion.setModelName("weather_ai_predictor");
+
+        when(modelVersionService.resolveCurrent(anyString(), anyString())).thenReturn(modelVersion);
+        when(weatherForecastRepository.findByForecastTimestamp(any(LocalDateTime.class))).thenReturn(Optional.empty());
+        when(weatherForecastRepository.save(any(WeatherForecast.class))).thenAnswer(invocation -> {
+            WeatherForecast saved = invocation.getArgument(0);
+            saved.setId(100L);
+            return saved;
+        });
+        lenient().when(weatherForecastRunRepository.findFirstByWeatherForecastAndModelVersionOrderByCreatedAtDesc(any(WeatherForecast.class), any(ModelVersion.class)))
+                .thenReturn(Optional.empty());
+        when(weatherForecastRunRepository.save(any(WeatherForecastRun.class))).thenAnswer(invocation -> {
+            WeatherForecastRun saved = invocation.getArgument(0);
+            saved.setId(200L);
+            return saved;
+        });
     }
 }

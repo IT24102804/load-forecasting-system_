@@ -17,6 +17,8 @@ public interface WeatherPredictionRepository extends JpaRepository<WeatherPredic
 
     List<WeatherPrediction> findAllByOrderByCreatedAtDesc();
 
+    WeatherPrediction findFirstByWeatherForecastRunIdOrderByCreatedAtDesc(Long weatherForecastRunId);
+
     List<WeatherPrediction> findByPredictionDateBetween(LocalDate startDate, LocalDate endDate);
 
     @Query("SELECT COUNT(w) FROM WeatherPrediction w")
@@ -37,15 +39,11 @@ public interface WeatherPredictionRepository extends JpaRepository<WeatherPredic
     @Query("SELECT SUM(w.rainfall) FROM WeatherPrediction w")
     Double getTotalRainfall();
 
-    @Query("SELECT FUNCTION('MONTH', w.predictionDate) as month, AVG(w.temperature) as avgTemp FROM WeatherPrediction w GROUP BY FUNCTION('MONTH', w.predictionDate) ORDER BY month")
+    @Query("SELECT FUNCTION('MONTH', w.predictionDate) as month, AVG(w.temperature) as avgTemp " +
+            "FROM WeatherPrediction w " +
+            "GROUP BY FUNCTION('MONTH', w.predictionDate) " +
+            "ORDER BY FUNCTION('MONTH', w.predictionDate)")
     List<Object[]> getMonthlyTemperatureAverages();
 
-    // Delete by ID
-    @Transactional
-    @Modifying
-    @Query("DELETE FROM WeatherPrediction w WHERE w.id = :id")
-    void deleteById(@Param("id") Long id);
 
-    // Check if exists by ID
-    boolean existsById(Long id);
 }

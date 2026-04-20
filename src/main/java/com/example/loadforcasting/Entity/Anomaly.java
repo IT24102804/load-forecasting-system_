@@ -16,6 +16,14 @@ public class Anomaly {
     @Column(name = "prediction_id")
     private Long predictionId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "load_forecast_run_id")
+    private LoadForecastRun loadForecastRun;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "model_version_id")
+    private ModelVersion modelVersion;
+
     // Sensor readings at time of anomaly
     @Column(name = "timestamp", nullable = false)
     private LocalDateTime timestamp;
@@ -53,6 +61,12 @@ public class Anomaly {
     @Column(name = "reason", length = 500)
     private String reason;
 
+    @Column(name = "source", length = 50)
+    private String source;
+
+    @Column(name = "model_name", length = 150)
+    private String modelName;
+
     // OPEN / ACKNOWLEDGED / RESOLVED
     @Column(name = "status", nullable = false)
     private String status = "OPEN";
@@ -66,6 +80,17 @@ public class Anomaly {
 
     @Column(name = "resolved_at")
     private LocalDateTime resolvedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "acknowledged_by_user_id")
+    private User acknowledgedByUser;
+
+    @Column(name = "acknowledged_at")
+    private LocalDateTime acknowledgedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "resolved_by_user_id")
+    private User resolvedByUser;
 
     // Was this a public event day?
     @Column(name = "public_event")
@@ -84,6 +109,12 @@ public class Anomaly {
 
     public Long getPredictionId() { return predictionId; }
     public void setPredictionId(Long predictionId) { this.predictionId = predictionId; }
+
+    public LoadForecastRun getLoadForecastRun() { return loadForecastRun; }
+    public void setLoadForecastRun(LoadForecastRun loadForecastRun) { this.loadForecastRun = loadForecastRun; }
+
+    public ModelVersion getModelVersion() { return modelVersion; }
+    public void setModelVersion(ModelVersion modelVersion) { this.modelVersion = modelVersion; }
 
     public LocalDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
@@ -118,6 +149,12 @@ public class Anomaly {
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }
 
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
+
+    public String getModelName() { return modelName; }
+    public void setModelName(String modelName) { this.modelName = modelName; }
+
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
@@ -129,6 +166,15 @@ public class Anomaly {
 
     public LocalDateTime getResolvedAt() { return resolvedAt; }
     public void setResolvedAt(LocalDateTime resolvedAt) { this.resolvedAt = resolvedAt; }
+
+    public User getAcknowledgedByUser() { return acknowledgedByUser; }
+    public void setAcknowledgedByUser(User acknowledgedByUser) { this.acknowledgedByUser = acknowledgedByUser; }
+
+    public LocalDateTime getAcknowledgedAt() { return acknowledgedAt; }
+    public void setAcknowledgedAt(LocalDateTime acknowledgedAt) { this.acknowledgedAt = acknowledgedAt; }
+
+    public User getResolvedByUser() { return resolvedByUser; }
+    public void setResolvedByUser(User resolvedByUser) { this.resolvedByUser = resolvedByUser; }
 
     public int getPublicEvent() { return publicEvent; }
     public void setPublicEvent(int publicEvent) { this.publicEvent = publicEvent; }

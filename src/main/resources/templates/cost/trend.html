@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Cost Trend', 'cost', ~{::content})}">
+<th:block th:fragment="content">
+
+<link rel="stylesheet" th:href="@{/css/weather.css}">
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb breadcrumb-custom">
+        <li class="breadcrumb-item"><a th:href="@{/home}"><i class="fas fa-home me-1"></i>Home</a></li>
+        <li class="breadcrumb-item"><a th:href="@{/cost}">Cost Prediction</a></li>
+        <li class="breadcrumb-item active">Trend Over Time</li>
+    </ol>
+</nav>
+
+
+<div class="weather-shell">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">
+                <i class="fas fa-chart-line me-2" style="color:var(--cobalt);"></i>Cost Trend Over Time
+            </h2>
+            <p class="text-muted mb-0">Monitor how unit cost changes across saved predictions, without filters.</p>
+        </div>
+        <div class="weather-summary-chip">
+            <i class="fas fa-coins me-2"></i><span id="trendChipText">Loading saved cost runs...</span>
+        </div>
+    </div>
+
+    <div id="trendAlert" class="alert alert-danger border-0 shadow-sm" style="display:none;"></div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-6 col-xl-4">
+            <div class="feature-card weather-stat-card h-100">
+                <div class="weather-stat-title">Latest Unit Cost</div>
+                <div id="trendLatest" class="weather-stat-number">--</div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-4">
+            <div class="feature-card weather-stat-card h-100">
+                <div class="weather-stat-title">Average Unit Cost</div>
+                <div id="trendAvg" class="weather-stat-number">--</div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-4">
+            <div class="feature-card weather-stat-card h-100">
+                <div class="weather-stat-title">Saved Predictions Loaded</div>
+                <div id="trendCount" class="weather-stat-number">--</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="ui-card weather-panel h-100">
+                <div class="card-header-custom px-4 py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-chart-area me-2" style="color:var(--cobalt);"></i>Unit Cost Trend
+                    </h5>
+                    <a th:href="@{/cost}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold">
+                        <i class="fas fa-arrow-left me-1"></i>Back to Cost
+                    </a>
+                </div>
+                <div class="p-4">
+                    <div class="weather-chart-container">
+                        <canvas id="costTrendOverTime"></canvas>
+                    </div>
+                    <div class="small text-muted mt-3">Each dot is one saved cost prediction. New saved entries will extend the line.</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="ui-card weather-panel h-100">
+                <div class="card-header-custom px-4 py-3">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-list-check me-2" style="color:var(--cobalt);"></i>Page Summary</h5>
+                </div>
+                <div class="p-4">
+                    <ul class="weather-summary-list mb-0">
+                        <li><strong>Default view:</strong> latest saved predictions sorted by forecast timestamp.</li>
+                        <li><strong>Best for:</strong> monitoring cost drift over time.</li>
+                        <li><strong>Data source:</strong> saved cost runs from the Cost Prediction module.</li>
+                        <li><strong>Tip:</strong> create more predictions across different days to see a clearer trend.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-card weather-panel mt-4">
+        <div class="card-header-custom px-4 py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="mb-0 fw-bold"><i class="fas fa-clock-rotate-left me-2" style="color:var(--cobalt);"></i>Recent Points</h5>
+            <span class="small text-muted">Latest saved unit cost predictions (most recent first)</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle weather-history-table">
+                <thead class="table-light">
+                <tr>
+                    <th>Cost Run</th>
+                    <th>Setup</th>
+                    <th>Timestamp</th>
+                    <th class="text-end">Unit Cost</th>
+                </tr>
+                </thead>
+                <tbody id="trendTableBody">
+                <tr>
+                    <td colspan="4" class="text-center py-4 text-muted">Loading...</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let trendChart = null;
+
+    function showTrendError(message) {
+        const box = document.getElementById('trendAlert');
+        box.textContent = message;
+        box.style.display = 'block';
+    }
+
+    function formatNumber(value) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
+    }
+
+    function formatTimestamp(value) {
+        if (!value) {
+            return '--';
+        }
+        const date = new Date(String(value));
+        if (Number.isNaN(date.getTime())) {
+            return String(value);
+        }
+        return date.toLocaleString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    function renderChart(points) {
+        const labels = points.map(p => formatTimestamp(p.timestamp));
+        const values = points.map(p => Number(p.unitCost));
+
+        if (trendChart) {
+            trendChart.destroy();
+        }
+
+        trendChart = new Chart(document.getElementById('costTrendOverTime').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Unit Cost (LKR/kWh)',
+                    data: values,
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.12)',
+                    pointBackgroundColor: '#0d6efd',
+                    pointRadius: 4,
+                    tension: 0.25,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: false, title: { display: true, text: 'LKR/kWh' } },
+                    x: { title: { display: true, text: 'Forecast Timestamp' } }
+                }
+            }
+        });
+    }
+
+    function renderRecentTable(points) {
+        const tbody = document.getElementById('trendTableBody');
+        if (!tbody) {
+            return;
+        }
+        if (!points.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted"><i class="fas fa-inbox me-2"></i>No saved cost predictions yet.</td></tr>';
+            return;
+        }
+
+        const rows = [...points]
+            .slice(-10)
+            .reverse()
+            .map(p => `
+                <tr>
+                    <td class="fw-semibold">${p.costRunId ?? '--'}</td>
+                    <td>${p.setupId ?? '--'}</td>
+                    <td>${formatTimestamp(p.timestamp)}</td>
+                    <td class="text-end">${formatNumber(p.unitCost)}</td>
+                </tr>
+            `)
+            .join('');
+        tbody.innerHTML = rows;
+    }
+
+    async function loadTrend() {
+        document.getElementById('trendAlert').style.display = 'none';
+
+        try {
+            const response = await fetch('/api/cost/trend/points');
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data?.error || 'Failed to load cost trend.');
+            }
+
+            const points = (data || [])
+                .filter(p => p && p.timestamp && p.unitCost != null)
+                .map(p => ({
+                    timestamp: p.timestamp,
+                    unitCost: Number(p.unitCost),
+                    costRunId: p.costRunId,
+                    setupId: p.setupId
+                }))
+                .filter(p => Number.isFinite(p.unitCost));
+
+            const chip = document.getElementById('trendChipText');
+            if (chip) {
+                chip.textContent = `${points.length} saved points loaded`;
+            }
+
+            if (!points.length) {
+                showTrendError('No saved cost predictions found yet. Generate a cost prediction first.');
+                document.getElementById('trendLatest').textContent = '--';
+                document.getElementById('trendAvg').textContent = '--';
+                document.getElementById('trendCount').textContent = '0';
+                renderChart([]);
+                renderRecentTable([]);
+                return;
+            }
+
+            const latest = points[points.length - 1];
+            const avg = points.reduce((sum, p) => sum + p.unitCost, 0) / points.length;
+
+            document.getElementById('trendLatest').textContent = formatNumber(latest.unitCost);
+            document.getElementById('trendAvg').textContent = formatNumber(avg);
+            document.getElementById('trendCount').textContent = String(points.length);
+
+            renderChart(points);
+            renderRecentTable(points);
+        } catch (e) {
+            showTrendError(e?.message || 'Failed to load cost trend.');
+        }
+    }
+
+    loadTrend();
+</script>
+
+</th:block>
+</html>

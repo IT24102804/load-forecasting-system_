@@ -1,7 +1,10 @@
 package com.example.loadforcasting.Controller;
 
 import com.example.loadforcasting.Entity.LoadRequest;
+import com.example.loadforcasting.Entity.LoadForecastRun;
+import com.example.loadforcasting.Entity.Anomaly;
 import com.example.loadforcasting.Entity.Feedback;
+import com.example.loadforcasting.Entity.FeedbackType;
 import com.example.loadforcasting.Repository.UserRepository;
 import com.example.loadforcasting.Service.AnomalyDetectionService;
 import com.example.loadforcasting.Service.FeedbackService;
@@ -15,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.closeTo;
@@ -49,6 +53,7 @@ class LoadControllerForecastAndFeedbackWebTest {
 
     @Test
     void forecast_ReturnsExpandedAnomalyPayload() throws Exception {
+        LocalDateTime ts = LocalDateTime.now(ZoneId.systemDefault()).plusHours(1).withNano(0);
         when(loadService.predictAndSave(any(LoadRequest.class))).thenAnswer(invocation -> {
             LoadRequest request = invocation.getArgument(0);
             request.setId(43L);
@@ -69,14 +74,14 @@ class LoadControllerForecastAndFeedbackWebTest {
 
         mockMvc.perform(post("/api/forecast")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .content(String.format("""
                                 {
-                                  "timestamp": "2026-04-13T14:00:00",
-                                  "temperature": 29.0,
-                                  "humidity": 79.0,
-                                  "public_event": 0
+                                  \"timestamp\": \"%s\",
+                                  \"temperature\": 29.0,
+                                  \"humidity\": 79.0,
+                                  \"public_event\": 0
                                 }
-                                """))
+                                """, ts)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(43))
                 .andExpect(jsonPath("$.load_demand", closeTo(1199.2949, 0.0001)))
@@ -93,6 +98,7 @@ class LoadControllerForecastAndFeedbackWebTest {
 
     @Test
     void forecast_NormalPrediction_ReturnsNormalPayload() throws Exception {
+        LocalDateTime ts = LocalDateTime.now(ZoneId.systemDefault()).plusHours(2).withNano(0);
         when(loadService.predictAndSave(any(LoadRequest.class))).thenAnswer(invocation -> {
             LoadRequest request = invocation.getArgument(0);
             request.setId(52L);
@@ -113,14 +119,14 @@ class LoadControllerForecastAndFeedbackWebTest {
 
         mockMvc.perform(post("/api/forecast")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .content(String.format("""
                                 {
-                                  "timestamp": "2026-04-13T10:00:00",
-                                  "temperature": 27.0,
-                                  "humidity": 74.0,
-                                  "public_event": 0
+                                  \"timestamp\": \"%s\",
+                                  \"temperature\": 27.0,
+                                  \"humidity\": 74.0,
+                                  \"public_event\": 0
                                 }
-                                """))
+                                """, ts)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(52))
                 .andExpect(jsonPath("$.load_demand", closeTo(1525.0, 0.0001)))
@@ -137,19 +143,20 @@ class LoadControllerForecastAndFeedbackWebTest {
 
     @Test
     void forecast_LoadPredictionFailure_ReturnsServerError() throws Exception {
+        LocalDateTime ts = LocalDateTime.now(ZoneId.systemDefault()).plusHours(1).withNano(0);
         when(loadService.predictAndSave(any(LoadRequest.class)))
                 .thenThrow(new RuntimeException("Load service offline"));
 
         mockMvc.perform(post("/api/forecast")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .content(String.format("""
                                 {
-                                  "timestamp": "2026-04-13T14:00:00",
-                                  "temperature": 29.0,
-                                  "humidity": 79.0,
-                                  "public_event": 0
+                                  \"timestamp\": \"%s\",
+                                  \"temperature\": 29.0,
+                                  \"humidity\": 79.0,
+                                  \"public_event\": 0
                                 }
-                                """))
+                                """, ts)))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.error").value("Prediction failed: Load service offline"));
     }
@@ -164,6 +171,14 @@ class LoadControllerForecastAndFeedbackWebTest {
         savedFeedback.setId(8L);
         savedFeedback.setUserName("System User");
         savedFeedback.setMessage("Looks correct");
+        savedFeedback.setFeedbackType(FeedbackType.ANOMALY_FEEDBACK);
+        savedFeedback.setSubjectScope("ANOMALY");
+        LoadForecastRun run = new LoadForecastRun();
+        run.setId(17L);
+        savedFeedback.setLoadForecastRun(run);
+        Anomaly anomaly = new Anomaly();
+        anomaly.setId(5L);
+        savedFeedback.setAnomaly(anomaly);
 
         when(loadService.getRequestById(43L)).thenReturn(storedRequest);
         when(feedbackService.saveFeedback(any())).thenReturn(savedFeedback);
@@ -180,7 +195,13 @@ class LoadControllerForecastAndFeedbackWebTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("feedback completely integrated and saved"));
+                .andExpect(jsonPath("$.status").value("feedback completely integrated and saved"))
+                .andExpect(jsonPath("$.feedbackId").value(8))
+                .andExpect(jsonPath("$.predictionId").value(43))
+                .andExpect(jsonPath("$.loadForecastRunId").value(17))
+                .andExpect(jsonPath("$.anomalyId").value(5))
+                .andExpect(jsonPath("$.feedbackType").value("ANOMALY_FEEDBACK"))
+                .andExpect(jsonPath("$.subjectScope").value("ANOMALY"));
 
         verify(anomalyDetectionService).storeFeedback(43L, true, true, 1.9922964233164904);
         verify(feedbackService).saveFeedback(any());

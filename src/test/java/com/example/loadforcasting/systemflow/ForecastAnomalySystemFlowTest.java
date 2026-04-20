@@ -6,6 +6,8 @@ import com.example.loadforcasting.systemflow.support.AbstractSystemFlowTest;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -19,8 +21,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class ForecastAnomalySystemFlowTest extends AbstractSystemFlowTest {
 
+    private static final DateTimeFormatter TS_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
     @Test
     void forecast_NormalFlow_PersistsPredictionWithoutAnomalyRecord() throws Exception {
+        LocalDateTime ts = LocalDateTime.now(ZoneId.systemDefault()).plusHours(1).withNano(0);
         stubLoadPrediction(1205.842);
         stubAnomalyDetection(false, 0.182, 0.58, "NORMAL",
                 "Load behavior matches historical patterns.", "local_outlier_factor");
@@ -28,7 +33,7 @@ class ForecastAnomalySystemFlowTest extends AbstractSystemFlowTest {
         mockMvc.perform(post("/api/forecast")
                         .contentType(APPLICATION_JSON)
                         .content(json(Map.of(
-                                "timestamp", "2026-04-13T14:00:00",
+                                "timestamp", ts.format(TS_FORMATTER),
                                 "temperature", 28.0,
                                 "humidity", 80.0,
                                 "publicEvent", 1
@@ -44,7 +49,7 @@ class ForecastAnomalySystemFlowTest extends AbstractSystemFlowTest {
 
         LoadRequest saved = firstLoadRequest();
         assertNotNull(saved.getId());
-        assertEquals(LocalDateTime.of(2026, 4, 13, 14, 0), saved.getTimestamp());
+        assertEquals(ts, saved.getTimestamp());
         assertEquals(1205.842, saved.getPredictedLoad(), 0.0001);
         assertFalse(Boolean.TRUE.equals(saved.getIsAnomaly()));
         assertEquals(0.182, saved.getAnomalyScore(), 0.0001);
@@ -52,6 +57,7 @@ class ForecastAnomalySystemFlowTest extends AbstractSystemFlowTest {
 
     @Test
     void forecast_AnomalyFlow_PersistsPredictionAndAnomalyRecord() throws Exception {
+        LocalDateTime ts = LocalDateTime.now(ZoneId.systemDefault()).plusHours(2).withNano(0);
         stubLoadPrediction(1200.752);
         stubAnomalyDetection(true, 3.186, 0.8775, "HIGH",
                 "Predicted load of 1200.8 kW is strongly abnormal for 30.0°C at hour 14.",
@@ -60,7 +66,7 @@ class ForecastAnomalySystemFlowTest extends AbstractSystemFlowTest {
         mockMvc.perform(post("/api/forecast")
                         .contentType(APPLICATION_JSON)
                         .content(json(Map.of(
-                                "timestamp", "2026-04-13T14:00:00",
+                                "timestamp", ts.format(TS_FORMATTER),
                                 "temperature", 30.0,
                                 "humidity", 80.0,
                                 "publicEvent", 0

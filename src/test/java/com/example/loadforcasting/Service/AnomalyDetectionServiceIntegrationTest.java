@@ -2,8 +2,11 @@ package com.example.loadforcasting.Service;
 
 import com.example.loadforcasting.Entity.Anomaly;
 import com.example.loadforcasting.Entity.LoadData;
+import com.example.loadforcasting.Entity.ModelVersion;
 import com.example.loadforcasting.Repository.AnomalyRepository;
+import com.example.loadforcasting.Repository.AnomalyStatusEventRepository;
 import com.example.loadforcasting.Repository.LoadDataRepository;
+import com.example.loadforcasting.Repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,7 +24,9 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -41,6 +46,18 @@ class AnomalyDetectionServiceIntegrationTest {
     @Mock
     private LoadDataRepository loadDataRepository;
 
+    @Mock
+    private AnomalyStatusEventRepository anomalyStatusEventRepository;
+
+    @Mock
+    private LoadService loadService;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private ModelVersionService modelVersionService;
+
     @InjectMocks
     private AnomalyDetectionService anomalyService;
 
@@ -49,6 +66,11 @@ class AnomalyDetectionServiceIntegrationTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(anomalyService, "anomalyServiceUrl", "http://localhost:5002");
+        ModelVersion modelVersion = new ModelVersion();
+        modelVersion.setId(1L);
+        modelVersion.setVersionLabel("v1");
+        modelVersion.setModelName("local_outlier_factor");
+        lenient().when(modelVersionService.resolveCurrent(anyString(), anyString())).thenReturn(modelVersion);
         RestTemplate restTemplate = (RestTemplate) ReflectionTestUtils.getField(anomalyService, "restTemplate");
         assertNotNull(restTemplate);
         mockServer = MockRestServiceServer.bindTo(restTemplate).build();

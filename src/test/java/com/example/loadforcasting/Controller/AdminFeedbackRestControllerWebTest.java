@@ -3,28 +3,24 @@ package com.example.loadforcasting.Controller;
 import com.example.loadforcasting.Entity.Feedback;
 import com.example.loadforcasting.Entity.FeedbackStatus;
 import com.example.loadforcasting.Entity.FeedbackType;
-import com.example.loadforcasting.Repository.FeedbackRepository;
 import com.example.loadforcasting.Repository.UserRepository;
+import com.example.loadforcasting.Service.FeedbackService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -36,7 +32,7 @@ class AdminFeedbackRestControllerWebTest {
     private MockMvc mockMvc;
 
     @MockBean
-    private FeedbackRepository feedbackRepository;
+    private FeedbackService feedbackService;
 
     @MockBean
     private UserRepository userRepository;
@@ -46,9 +42,9 @@ class AdminFeedbackRestControllerWebTest {
         Feedback first = feedback(1L, "First reply", FeedbackStatus.ACKNOWLEDGED);
         Feedback second = feedback(2L, null, FeedbackStatus.PENDING);
 
-        when(feedbackRepository.findAll()).thenReturn(List.of(first, second));
+        when(feedbackService.getAllFeedback()).thenReturn(List.of(first, second));
 
-        mockMvc.perform(get("/api/admin/feedback"))
+        mockMvc.perform(get("/api/admin/feedback").session(adminSession()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].id").value(1))
@@ -61,10 +57,12 @@ class AdminFeedbackRestControllerWebTest {
     @Test
     void replyFeedback_ExistingId_UpdatesReplyAndMarksResolved() throws Exception {
         Feedback existing = feedback(7L, null, FeedbackStatus.PENDING);
-        when(feedbackRepository.findById(7L)).thenReturn(Optional.of(existing));
-        when(feedbackRepository.save(any(Feedback.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        existing.setAdminReply("Issue reviewed and resolved by admin.");
+        existing.setStatus(FeedbackStatus.RESOLVED);
+        when(feedbackService.replyFeedback(any(Long.class), any(String.class), any(Integer.class))).thenReturn(existing);
 
         mockMvc.perform(put("/api/admin/feedback/7")
+                        .session(adminSession())
                         .contentType(APPLICATION_JSON)
                         .content("""
                                 {
@@ -75,28 +73,22 @@ class AdminFeedbackRestControllerWebTest {
                 .andExpect(jsonPath("$.id").value(7))
                 .andExpect(jsonPath("$.adminReply").value("Issue reviewed and resolved by admin."))
                 .andExpect(jsonPath("$.status").value("RESOLVED"));
-
-        verify(feedbackRepository).save(argThat(saved ->
-                saved.getId().equals(7L)
-                        && "Issue reviewed and resolved by admin.".equals(saved.getAdminReply())
-                        && saved.getStatus() == FeedbackStatus.RESOLVED));
     }
 
     @Test
     void replyFeedback_MissingId_ReturnsEmptyBodyWithoutSaving() throws Exception {
-        when(feedbackRepository.findById(99L)).thenReturn(Optional.empty());
+        when(feedbackService.replyFeedback(any(Long.class), any(String.class), any(Integer.class)))
+                .thenThrow(new RuntimeException("Feedback not found"));
 
         mockMvc.perform(put("/api/admin/feedback/99")
+                        .session(adminSession())
                         .contentType(APPLICATION_JSON)
                         .content("""
                                 {
                                   "adminReply": "No record found."
                                 }
                                 """))
-                .andExpect(status().isOk())
-                .andExpect(content().string(""));
-
-        verify(feedbackRepository, never()).save(any(Feedback.class));
+                .andExpect(status().isNotFound());
     }
 
     private Feedback feedback(Long id, String adminReply, FeedbackStatus status) {
@@ -110,5 +102,12 @@ class AdminFeedbackRestControllerWebTest {
         feedback.setStatus(status);
         feedback.setRating(4);
         return feedback;
+    }
+
+    private MockHttpSession adminSession() {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("userid", 1);
+        session.setAttribute("role", "Admin");
+        return session;
     }
 }

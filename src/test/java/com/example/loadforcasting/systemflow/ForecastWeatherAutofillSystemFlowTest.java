@@ -3,6 +3,8 @@ package com.example.loadforcasting.systemflow;
 import com.example.loadforcasting.systemflow.support.AbstractSystemFlowTest;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -15,11 +17,12 @@ class ForecastWeatherAutofillSystemFlowTest extends AbstractSystemFlowTest {
 
     @Test
     void predictTransient_ReturnsWeatherWithoutPersistingHistory() throws Exception {
+        LocalDateTime ts = LocalDateTime.now(ZoneId.systemDefault()).plusHours(1).withNano(0);
         stubWeatherPrediction(29.4, 78.1, 3.2, 1.5, 512.4);
 
         mockMvc.perform(post("/api/weather/predict-transient")
                         .contentType(APPLICATION_JSON)
-                        .content(json(Map.of("timestamp", "2026-04-13T14:30:00"))))
+                        .content(json(Map.of("timestamp", ts.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.temperature").value(29.4))
                 .andExpect(jsonPath("$.humidity").value(78.1))
@@ -30,6 +33,7 @@ class ForecastWeatherAutofillSystemFlowTest extends AbstractSystemFlowTest {
 
     @Test
     void predictTransientThenForecast_UsesReturnedWeatherWithoutCreatingWeatherRows() throws Exception {
+        LocalDateTime ts = LocalDateTime.now(ZoneId.systemDefault()).plusHours(2).withNano(0);
         stubWeatherPrediction(28.0, 80.0, 3.0, 0.0, 500.0);
         stubLoadPrediction(1205.842);
         stubAnomalyDetection(false, 0.182, 0.58, "NORMAL",
@@ -37,7 +41,7 @@ class ForecastWeatherAutofillSystemFlowTest extends AbstractSystemFlowTest {
 
         mockMvc.perform(post("/api/weather/predict-transient")
                         .contentType(APPLICATION_JSON)
-                        .content(json(Map.of("timestamp", "2026-04-13T14:00:00"))))
+                        .content(json(Map.of("timestamp", ts.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.temperature").value(28.0))
                 .andExpect(jsonPath("$.humidity").value(80.0));
@@ -45,7 +49,7 @@ class ForecastWeatherAutofillSystemFlowTest extends AbstractSystemFlowTest {
         mockMvc.perform(post("/api/forecast")
                         .contentType(APPLICATION_JSON)
                         .content(json(Map.of(
-                                "timestamp", "2026-04-13T14:00:00",
+                                "timestamp", ts.toString(),
                                 "temperature", 28.0,
                                 "humidity", 80.0,
                                 "publicEvent", 1
