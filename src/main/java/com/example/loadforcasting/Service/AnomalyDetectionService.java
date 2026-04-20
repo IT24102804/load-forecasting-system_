@@ -60,6 +60,7 @@ public class AnomalyDetectionService {
 
         try {
             Map<String, Object> request = new HashMap<>();
+
             request.put("load", predictedLoad);
             request.put("temp", temperature);
             request.put("humidity", humidity);
@@ -72,6 +73,7 @@ public class AnomalyDetectionService {
             Map response = restTemplate.postForObject(
                     anomalyServiceUrl + "/detect_anomaly", request, Map.class);
 
+            result = new HashMap<>();
             if (response != null) {
                 result = new HashMap<>();
                 boolean isAnomaly = parseBoolean(response.get("is_anomaly"));

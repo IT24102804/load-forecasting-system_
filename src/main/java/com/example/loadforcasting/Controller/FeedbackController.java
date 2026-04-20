@@ -64,6 +64,11 @@ public class FeedbackController {
         return "feedback/submit";
     }
 
+
+
+
+
+
     @PostMapping("/submit")
     public String submitFeedback(@ModelAttribute Feedback feedback,
                                  @RequestParam(required = false) Long anomalyId,
@@ -100,6 +105,11 @@ public class FeedbackController {
             return "redirect:" + buildSubmitRedirect(feedback.getPredictionId(), anomalyId);
         }
     }
+
+
+
+
+
 
     @GetMapping("/my-feedback")
     public String viewMyFeedback(@RequestParam(required = false) String email,
