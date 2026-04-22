@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <link rel="stylesheet" href="/css/main.css">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 
 </head>
 <body>
@@ -85,7 +86,7 @@
             </div>
             <div class="modal-footer bg-light">
                 <button class="btn btn-outline-secondary fw-bold" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-primary-custom px-4" onclick="submitReply()">
+                <button class="btn btn-primary-custom px-4" onclick="submitReply(this)">
                     <i class="fas fa-paper-plane me-2"></i> Submit & Resolve
                 </button>
             </div>
@@ -97,6 +98,7 @@
 <script>
     // Create an instance of the modal for better programmatic control
     let replyModalInstance;
+    const feedbackContainer = document.getElementById("feedbackContainer");
 
     document.addEventListener("DOMContentLoaded", function() {
         replyModalInstance = new bootstrap.Modal(document.getElementById('replyModal'));
@@ -105,64 +107,134 @@
         document.getElementById('replyText').addEventListener('input', function() {
             this.classList.remove('is-invalid');
         });
+
+        loadFeedbacks();
     });
 
-    function loadFeedbacks() {
-        fetch("/api/admin/feedback")
-            .then(function(res) { return res.json(); })
-            .then(function(feedbacks) {
-                var container = document.getElementById("feedbackContainer");
-                container.innerHTML = "";
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
 
-                if (feedbacks.length === 0) {
-                    container.innerHTML = '<div class="text-center py-5 ui-card"><i class="fas fa-check-circle fa-3x mb-3" style="color: #28a745;"></i><h5 class="text-muted">No pending feedback in the queue!</h5></div>';
-                    return;
+    async function parseApiResponse(response) {
+        const contentType = (response.headers.get("content-type") || "").toLowerCase();
+        if (contentType.includes("application/json")) {
+            return { data: await response.json(), isJson: true };
+        }
+        return { data: await response.text(), isJson: false };
+    }
+
+    function describeResponseError(response, payload, isJson, action) {
+        if (isJson && payload && typeof payload === "object" && payload.error) {
+            return payload.error;
+        }
+        if (response.status === 403) {
+            return "Admin session expired. Please sign in again.";
+        }
+        if (response.status === 400) {
+            return action === "reply"
+                ? "Could not save the admin reply. Please review the input and try again."
+                : "Could not load admin feedback because the request was rejected.";
+        }
+        if (response.status >= 500) {
+            return action === "reply"
+                ? "Server error while saving the admin reply."
+                : "Server error while loading the admin feedback queue.";
+        }
+        return action === "reply"
+            ? "Could not save the admin reply."
+            : "Could not load the admin feedback queue.";
+    }
+
+    function renderFeedbackError(message) {
+        feedbackContainer.innerHTML =
+            '<div class="alert alert-danger shadow-sm border-0">' +
+            '<i class="fas fa-exclamation-triangle me-2"></i>' +
+            escapeHtml(message) +
+            '</div>';
+    }
+
+    async function loadFeedbacks() {
+        feedbackContainer.innerHTML =
+            '<div class="text-center py-5 ui-card">' +
+            '<div class="spinner-border" style="color: var(--cobalt);" role="status"></div>' +
+            '<p class="mt-3 text-muted fw-bold">Loading feedback queue...</p>' +
+            '</div>';
+
+        try {
+            const response = await fetch("/api/admin/feedback", {
+                headers: { "Accept": "application/json" }
+            });
+            const { data, isJson } = await parseApiResponse(response);
+
+            if (!response.ok) {
+                throw new Error(describeResponseError(response, data, isJson, "load"));
+            }
+            if (!Array.isArray(data)) {
+                throw new Error("Unexpected response received from the admin feedback API.");
+            }
+
+            feedbackContainer.innerHTML = "";
+
+            if (data.length === 0) {
+                feedbackContainer.innerHTML = '<div class="text-center py-5 ui-card"><i class="fas fa-check-circle fa-3x mb-3" style="color: #28a745;"></i><h5 class="text-muted">No pending feedback in the queue!</h5></div>';
+                return;
+            }
+
+            data.forEach(function(fb) {
+                var safeUserName = escapeHtml(fb.userName || "Anonymous User");
+                var safeUserEmail = escapeHtml(fb.userEmail || "No email provided");
+                var safeMessage = escapeHtml(fb.message || "");
+                var safeAdminReply = escapeHtml(fb.adminReply || "");
+
+                var statusBadge = fb.status === "RESOLVED"
+                    ? '<span class="badge bg-success px-2 py-1 rounded-pill"><i class="fas fa-check me-1"></i>Resolved</span>'
+                    : '<span class="badge bg-warning text-dark px-2 py-1 rounded-pill"><i class="fas fa-clock me-1"></i>Pending</span>';
+
+                var replySection = "";
+                if (fb.adminReply) {
+                    replySection =
+                        '<div class="mt-3 p-3 rounded" style="background-color: rgba(0, 71, 171, 0.05); border-left: 3px solid var(--cobalt);">' +
+                        '<small class="text-uppercase fw-bold d-block mb-1" style="color: var(--cobalt); font-size: 0.75rem;"><i class="fas fa-user-shield me-1"></i>Administrator Response</small>' +
+                        '<p class="mb-0 text-dark">' + safeAdminReply + '</p>' +
+                        '</div>';
                 }
 
-                feedbacks.forEach(function(fb) {
-                    // Match UI tags from user-facing side
-                    var statusBadge = fb.status === "RESOLVED"
-                        ? '<span class="badge bg-success px-2 py-1 rounded-pill"><i class="fas fa-check me-1"></i>Resolved</span>'
-                        : '<span class="badge bg-warning text-dark px-2 py-1 rounded-pill"><i class="fas fa-clock me-1"></i>Pending</span>';
+                var replyButton = fb.status === "RESOLVED"
+                    ? '<button class="btn btn-outline-secondary btn-sm mt-3 px-3 fw-bold rounded-pill" disabled><i class="fas fa-lock me-1"></i> Resolved</button>'
+                    : '<button class="btn btn-primary-custom btn-sm mt-3 px-3 rounded-pill" data-id="' + fb.id + '" data-message="' + encodeURIComponent(fb.message || "") + '" onclick="openReplyModalFromButton(this)"><i class="fas fa-reply me-1"></i> Draft Reply</button>';
 
-                    var replySection = "";
-                    if (fb.adminReply) {
-                        replySection =
-                            '<div class="mt-3 p-3 rounded" style="background-color: rgba(0, 71, 171, 0.05); border-left: 3px solid var(--cobalt);">' +
-                            '<small class="text-uppercase fw-bold d-block mb-1" style="color: var(--cobalt); font-size: 0.75rem;"><i class="fas fa-user-shield me-1"></i>Administrator Response</small>' +
-                            '<p class="mb-0 text-dark">' + fb.adminReply + '</p>' +
-                            '</div>';
-                    }
+                var card = document.createElement("div");
+                card.className = "card ui-card mb-4 border-0";
+                card.innerHTML =
+                    '<div class="card-body p-4">' +
+                    '<div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">' +
+                    '<div>' +
+                    '<i class="fas fa-user-circle fs-4 me-2 align-middle text-muted"></i>' +
+                    '<strong class="align-middle" style="color: var(--navy);">' + safeUserName + '</strong>' +
+                    '<span class="text-muted ms-2 me-3 small">(' + safeUserEmail + ')</span>' +
+                    statusBadge +
+                    '</div>' +
+                    '<span class="text-muted small fw-bold"><i class="fas fa-ticket-alt me-1"></i>Ticket #' + fb.id + '</span>' +
+                    '</div>' +
+                    '<p class="fs-6 mb-2" style="color: #333;">"' + safeMessage + '"</p>' +
+                    replySection +
+                    '<div class="text-end">' + replyButton + '</div>' +
+                    '</div>';
 
-                    var replyButton = fb.status === "RESOLVED"
-                        ? '<button class="btn btn-outline-secondary btn-sm mt-3 px-3 fw-bold rounded-pill" disabled><i class="fas fa-lock me-1"></i> Resolved</button>'
-                        : '<button class="btn btn-primary-custom btn-sm mt-3 px-3 rounded-pill" onclick="openReplyModal(' + fb.id + ', \'' + fb.message.replace(/'/g, "\\'") + '\')"><i class="fas fa-reply me-1"></i> Draft Reply</button>';
-
-                    var card = document.createElement("div");
-                    card.className = "card ui-card mb-4 border-0";
-                    card.innerHTML =
-                        '<div class="card-body p-4">' +
-                        '<div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">' +
-                        '<div>' +
-                        '<i class="fas fa-user-circle fs-4 me-2 align-middle text-muted"></i>' +
-                        '<strong class="align-middle" style="color: var(--navy);">' + (fb.userName || 'Anonymous User') + '</strong>' +
-                        '<span class="text-muted ms-2 me-3 small">(' + fb.userEmail + ')</span>' +
-                        statusBadge +
-                        '</div>' +
-                        '<span class="text-muted small fw-bold"><i class="fas fa-ticket-alt me-1"></i>Ticket #' + fb.id + '</span>' +
-                        '</div>' +
-                        '<p class="fs-6 mb-2" style="color: #333;">"' + fb.message + '"</p>' +
-                        replySection +
-                        '<div class="text-end">' + replyButton + '</div>' +
-                        '</div>';
-
-                    container.appendChild(card);
-                });
-            })
-            .catch(function() {
-                document.getElementById("feedbackContainer").innerHTML =
-                    '<div class="alert alert-danger shadow-sm border-0"><i class="fas fa-exclamation-triangle me-2"></i>Backend API disconnected. Ensure the Spring Boot server is running on port 8080.</div>';
+                feedbackContainer.appendChild(card);
             });
+        } catch (error) {
+            if (error instanceof TypeError) {
+                renderFeedbackError("Could not reach the admin feedback API. Ensure the Spring Boot server is running.");
+                return;
+            }
+            renderFeedbackError(error.message || "Could not load the admin feedback queue.");
+        }
     }
 
     function openReplyModal(id, message) {
@@ -176,7 +248,11 @@
         replyModalInstance.show();
     }
 
-    function submitReply() {
+    function openReplyModalFromButton(button) {
+        openReplyModal(button.dataset.id, decodeURIComponent(button.dataset.message || ""));
+    }
+
+    async function submitReply(button) {
         var id = document.getElementById("replyFeedbackId").value;
         var replyInput = document.getElementById("replyText");
         var replyText = replyInput.value.trim();
@@ -193,38 +269,38 @@
         };
 
         // Temporary Loading State on Button
-        var btn = event.currentTarget;
-        var originalBtnHtml = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Sending...';
-        btn.disabled = true;
+        var originalBtnHtml = button.innerHTML;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Sending...';
+        button.disabled = true;
 
-        fetch("/api/admin/feedback/" + id, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(feedbackData)
-        })
-            .then(function(res) {
-                if(!res.ok) throw new Error("Server error");
-                return res.json();
-            })
-            .then(function() {
-                replyModalInstance.hide();
-                loadFeedbacks(); // Refresh the list
-            })
-            .catch(function(err) {
-                alert("Critical Error: Could not send reply. Verify backend connection.");
-                console.error(err);
-            })
-            .finally(function() {
-                // Restore button state
-                btn.innerHTML = originalBtnHtml;
-                btn.disabled = false;
+        try {
+            const response = await fetch("/api/admin/feedback/" + id, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                body: JSON.stringify(feedbackData)
             });
-    }
+            const { data, isJson } = await parseApiResponse(response);
 
-    window.onload = function() {
-        loadFeedbacks();
-    };
+            if (!response.ok) {
+                throw new Error(describeResponseError(response, data, isJson, "reply"));
+            }
+
+            replyModalInstance.hide();
+            loadFeedbacks();
+        } catch (error) {
+            if (error instanceof TypeError) {
+                renderFeedbackError("Could not reach the admin feedback API. Ensure the Spring Boot server is running.");
+            } else {
+                renderFeedbackError(error.message || "Could not save the admin reply.");
+            }
+        } finally {
+            button.innerHTML = originalBtnHtml;
+            button.disabled = false;
+        }
+    }
 </script>
 </body>
 </html>

@@ -2,12 +2,15 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import json
 import joblib
+import logging
 import numpy as np
 import os
 import pandas as pd
 
 app = Flask(__name__)
 CORS(app)
+logging.basicConfig(level=os.environ.get("ANOMALY_LOG_LEVEL", "INFO"))
+logger = logging.getLogger(__name__)
 
 model = None
 scaler = None
@@ -31,7 +34,11 @@ DAY_NAMES = {
 @app.route("/anomaly_feedback", methods=["POST"])
 def anomaly_feedback():
     data = request.json or {}
-    print(f"Feedback received for prediction {data.get('prediction_id')}: User Agreed? {data.get('user_agreed')}")
+    logger.info(
+        "Feedback received for prediction %s: user_agreed=%s",
+        data.get("prediction_id"),
+        data.get("user_agreed"),
+    )
     return jsonify({"status": "success", "message": "Feedback logged in Python!"}), 200
 
 
@@ -52,35 +59,40 @@ def load_model():
 
     model_metadata = load_json_file(metadata_path)
     if model_metadata:
-        print("Loaded model metadata.")
+        logger.info("Loaded model metadata.")
 
     if os.path.exists(model_path):
         model = joblib.load(model_path)
-        print("Model loaded.")
+        logger.info("Model loaded.")
     else:
-        print("Model file not found.")
+        logger.warning("Model file not found.")
 
     if os.path.exists(scaler_path):
         scaler = joblib.load(scaler_path)
-        print("Scaler loaded.")
+        logger.info("Scaler loaded.")
     else:
-        print("Scaler file not found.")
+        logger.warning("Scaler file not found.")
 
     feature_order = model_metadata.get("feature_order") or list(getattr(scaler, "feature_names_in_", [])) or DEFAULT_FEATURE_ORDER
     selected_model_name = model_metadata.get("selected_model") or type(model).__name__
 
-    print(f"Selected model: {selected_model_name}")
-    print(f"Expecting features: {feature_order}")
+    logger.info("Selected model: %s", selected_model_name)
+    logger.info("Expecting features: %s", feature_order)
+
+
+def parse_feature_value(feature: str, value):
+    if value is None:
+        return 0
+    if feature in {"hour", "day", "month", "event", "season"}:
+        return int(value)
+    return float(value)
 
 
 def build_feature_frame(payload: dict) -> pd.DataFrame:
     row = {}
     for feature in feature_order:
         value = payload.get(feature, 0)
-        if feature in {"hour", "day", "month", "event", "season"}:
-            row[feature] = int(value)
-        else:
-            row[feature] = float(value)
+        row[feature] = parse_feature_value(feature, value)
     return pd.DataFrame([row], columns=feature_order)
 
 
@@ -115,7 +127,7 @@ def build_reason(data: dict, severity: str, is_anomaly: bool) -> str:
     if severity == "HIGH":
         return (
             f"Predicted load of {load_value:.1f} kW is strongly abnormal for "
-            f"{temp_value:.1f}°C at hour {hour_value}."
+            f"{temp_value:.1f} degrees C at hour {hour_value}."
         )
     if severity == "MEDIUM":
         return f"Unusual load pattern detected compared to normal {current_day} behavior."
@@ -125,9 +137,19 @@ def build_reason(data: dict, severity: str, is_anomaly: bool) -> str:
 @app.route("/detect_anomaly", methods=["POST"])
 def detect_anomaly():
     try:
-        data = request.get_json() or {}
+        data = request.get_json(silent=True)
+        if data is None or not isinstance(data, dict):
+            return jsonify({"error": "Request body must be a JSON object."}), 400
         if model is None or scaler is None:
             return jsonify({"is_anomaly": False, "error": "Model not loaded"}), 503
+
+        for feature in feature_order:
+            if feature not in data:
+                continue
+            try:
+                parse_feature_value(feature, data.get(feature))
+            except (TypeError, ValueError):
+                return jsonify({"error": f"Feature '{feature}' must be numeric."}), 400
 
         feature_frame = build_feature_frame(data)
         features_scaled = scaler.transform(feature_frame)
@@ -157,6 +179,7 @@ def detect_anomaly():
             }
         )
     except Exception as error:
+        logger.exception("Unexpected error during anomaly detection.")
         return jsonify({"is_anomaly": False, "error": str(error)}), 500
 
 
@@ -176,4 +199,8 @@ def health():
 
 if __name__ == "__main__":
     load_model()
-    app.run(host="0.0.0.0", port=5002, debug=True)
+    app.run(
+        host="0.0.0.0",
+        port=5002,
+        debug=os.environ.get("FLASK_DEBUG", "").lower() in {"1", "true", "yes", "on"},
+    )

@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 @Component // This tells Spring Boot to activate this filter automatically
 public class AdminSecurityFilter implements Filter {
@@ -23,8 +24,11 @@ public class AdminSecurityFilter implements Filter {
 
         String requestURI = req.getRequestURI();
 
+        boolean adminPageRequest = requestURI.startsWith("/admin/");
+        boolean adminApiRequest = requestURI.startsWith("/api/admin/");
+
         // 1. Check if the user is trying to access ANY file inside the /admin/ folder
-        if (requestURI.startsWith("/admin/") || requestURI.startsWith("/api/admin/")) {
+        if (adminPageRequest || adminApiRequest) {
             boolean isAuthorized = false;
 
             // 2. Check if they have an active session AND their role is Admin
@@ -37,7 +41,15 @@ public class AdminSecurityFilter implements Filter {
 
             // 3. If they are not an Admin, kick them back to the login page
             if (!isAuthorized) {
-                res.sendRedirect("/");
+                if (adminApiRequest) {
+                    byte[] body = "{\"error\":\"Admin session is required.\"}".getBytes(StandardCharsets.UTF_8);
+                    res.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    res.setContentType("application/json");
+                    res.setCharacterEncoding(StandardCharsets.UTF_8.name());
+                    res.getOutputStream().write(body);
+                } else {
+                    res.sendRedirect("/");
+                }
                 return; // Stop processing the request immediately
             }
         }

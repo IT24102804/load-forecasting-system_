@@ -96,12 +96,20 @@
 
         <div class="feedback-header px-4 py-3 d-flex justify-content-between align-items-center">
           <div>
-            <span class="badge bg-dark me-2" th:text="${fb.feedbackType.toString().replace('_', ' ')}">Type</span>
+            <span class="feedback-type-badge me-2"
+                  th:classappend="${fb.feedbackType == T(com.example.loadforcasting.Entity.FeedbackType).ANOMALY_FEEDBACK} ? ' feedback-type-anomaly' :
+                                  (${fb.feedbackType == T(com.example.loadforcasting.Entity.FeedbackType).INACCURATE_FORECAST} ? ' feedback-type-forecast' :
+                                  (${fb.feedbackType == T(com.example.loadforcasting.Entity.FeedbackType).FEATURE_REQUEST} ? ' feedback-type-feature' :
+                                  (${fb.feedbackType == T(com.example.loadforcasting.Entity.FeedbackType).BUG_REPORT} ? ' feedback-type-bug' :
+                                  (${fb.feedbackType == T(com.example.loadforcasting.Entity.FeedbackType).SUGGESTION} ? ' feedback-type-suggestion' : ' feedback-type-general'))))"
+                  th:text="${fb.feedbackType.toString().replace('_', ' ')}">Type</span>
 
-            <span class="badge" th:classappend="${fb.status == 'PENDING'} ? 'bg-warning text-dark' :
-                                                              (${fb.status == 'ACKNOWLEDGED'} ? 'bg-info text-dark' :
-                                                              (${fb.status == 'RESOLVED'} ? 'bg-success' : 'bg-secondary'))"
-                  th:text="${fb.status}">Status</span>
+            <span class="feedback-status-badge"
+                  th:classappend="${fb.status == T(com.example.loadforcasting.Entity.FeedbackStatus).PENDING} ? ' feedback-status-pending' :
+                                  (${fb.status == T(com.example.loadforcasting.Entity.FeedbackStatus).ACKNOWLEDGED} ? ' feedback-status-acknowledged' :
+                                  (${fb.status == T(com.example.loadforcasting.Entity.FeedbackStatus).IN_PROGRESS} ? ' feedback-status-in-progress' :
+                                  (${fb.status == T(com.example.loadforcasting.Entity.FeedbackStatus).RESOLVED} ? ' feedback-status-resolved' : ' feedback-status-closed')))"
+                  th:text="${fb.status.toString().replace('_', ' ')}">Status</span>
           </div>
           <small class="fw-bold" style="color: var(--slate);" th:text="${fb.formattedDate}">Date</small>
         </div>

@@ -2,6 +2,8 @@ package com.example.loadforcasting.Controller;
 
 import com.example.loadforcasting.Entity.Feedback;
 import com.example.loadforcasting.Service.FeedbackService;
+import com.example.loadforcasting.dto.AdminFeedbackItem;
+import com.example.loadforcasting.dto.AdminFeedbackReplyRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -18,22 +20,39 @@ public class AdminFeedbackRestController {
     private FeedbackService feedbackService;
 
     @GetMapping
-    public List<Feedback> getAllFeedback(HttpSession session) {
+    public List<AdminFeedbackItem> getAllFeedback(HttpSession session) {
         requireAdmin(session);
-        return feedbackService.getAllFeedback();
+        return feedbackService.getAllFeedback().stream()
+                .map(this::toAdminFeedbackItem)
+                .toList();
     }
 
     @PutMapping("/{id}")
-    public Feedback replyFeedback(@PathVariable Long id,
-                                  @RequestBody Feedback updatedFeedback,
+    public AdminFeedbackItem replyFeedback(@PathVariable Long id,
+                                  @RequestBody AdminFeedbackReplyRequest request,
                                   HttpSession session) {
         requireAdmin(session);
         Integer userId = (Integer) session.getAttribute("userid");
+        if (request == null || request.adminReply() == null || request.adminReply().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Admin reply is required.");
+        }
         try {
-            return feedbackService.replyFeedback(id, updatedFeedback.getAdminReply(), userId);
+            Feedback saved = feedbackService.replyFeedback(id, request.adminReply().trim(), userId);
+            return toAdminFeedbackItem(saved);
         } catch (RuntimeException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }
+    }
+
+    private AdminFeedbackItem toAdminFeedbackItem(Feedback feedback) {
+        return new AdminFeedbackItem(
+                feedback.getId(),
+                feedback.getUserName(),
+                feedback.getUserEmail(),
+                feedback.getMessage(),
+                feedback.getStatus() != null ? feedback.getStatus().name() : null,
+                feedback.getAdminReply()
+        );
     }
 
     private void requireAdmin(HttpSession session) {

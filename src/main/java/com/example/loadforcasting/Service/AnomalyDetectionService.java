@@ -26,10 +26,13 @@ import java.util.concurrent.CompletableFuture;
 @Service
 public class AnomalyDetectionService {
 
+    private static final int ANOMALY_CONNECT_TIMEOUT_MS = 1500;
+    private static final int ANOMALY_READ_TIMEOUT_MS = 4000;
+
     @Value("${anomaly.service.url:http://localhost:5002}")
     private String anomalyServiceUrl;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = createAnomalyRestTemplate();
 
     @Autowired
     private AnomalyRepository anomalyRepository;
@@ -51,6 +54,13 @@ public class AnomalyDetectionService {
 
     @Autowired
     private ModelVersionService modelVersionService;
+
+    private RestTemplate createAnomalyRestTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(ANOMALY_CONNECT_TIMEOUT_MS);
+        factory.setReadTimeout(ANOMALY_READ_TIMEOUT_MS);
+        return new RestTemplate(factory);
+    }
 
     public Map<String, Object> detectAnomaly(Long predictionId, LocalDateTime forecastTimestamp,
                                              double predictedLoad, double temperature,
@@ -150,18 +160,18 @@ public class AnomalyDetectionService {
             isAnomaly = true;
             if (zScore >= 4.0) {
                 severity = "HIGH";
-                reason = String.format(Locale.ROOT, "Load (%.1f kW) is %.1fσ from hourly mean (%.1f kW). Critical.", load, zScore, mean);
+                reason = String.format(Locale.ROOT, "Load (%.1f kW) is %.1f sigma from hourly mean (%.1f kW). Critical.", load, zScore, mean);
             } else if (zScore >= 3.0) {
                 severity = "MEDIUM";
-                reason = String.format(Locale.ROOT, "Load (%.1f kW) deviates %.1fσ from hourly average (%.1f kW).", load, zScore, mean);
+                reason = String.format(Locale.ROOT, "Load (%.1f kW) deviates %.1f sigma from hourly average (%.1f kW).", load, zScore, mean);
             } else {
                 severity = "LOW";
-                reason = String.format(Locale.ROOT, "Mild anomaly: load (%.1f kW) is %.1fσ from mean (%.1f kW).", load, zScore, mean);
+                reason = String.format(Locale.ROOT, "Mild anomaly: load (%.1f kW) is %.1f sigma from mean (%.1f kW).", load, zScore, mean);
             }
         } else if (temperature > 35 && load < mean * 0.7) {
             isAnomaly = true;
             severity = "MEDIUM";
-            reason = String.format(Locale.ROOT, "Low load (%.1f kW) during high temp (%.1f°C). Possible outage.", load, temperature);
+            reason = String.format(Locale.ROOT, "Low load (%.1f kW) during high temp (%.1f degrees C). Possible outage.", load, temperature);
             anomalyScore = 0.65;
         }
 

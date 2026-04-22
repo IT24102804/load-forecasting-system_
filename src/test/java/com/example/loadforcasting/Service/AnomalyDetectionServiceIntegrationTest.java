@@ -17,6 +17,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
@@ -182,6 +183,42 @@ class AnomalyDetectionServiceIntegrationTest {
                         && forecastTimestamp.equals(anomaly.getTimestamp())
                         && anomaly.getConfidence() != null
                         && "HIGH".equals(anomaly.getSeverity())
+        ));
+
+        mockServer.verify();
+    }
+
+    @Test
+    void detectAnomaly_TimeoutLikeFailure_FallsBackToRuleBasedAndSaves() {
+        LocalDateTime forecastTimestamp = LocalDateTime.of(2026, 6, 4, 15, 0);
+
+        when(loadDataRepository.findAll()).thenReturn(List.of(
+                buildLoadData(15, 3000.0),
+                buildLoadData(15, 3100.0),
+                buildLoadData(15, 3200.0)
+        ));
+        when(anomalyRepository.save(any(Anomaly.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        mockServer.expect(requestTo("http://localhost:5002/detect_anomaly"))
+                .andRespond(request -> {
+                    throw new ResourceAccessException("Read timed out");
+                });
+
+        Map<String, Object> result = anomalyService.detectAnomaly(
+                88L, forecastTimestamp, 4950.0, 37.0, 86.0, 0, 15, 4, 6
+        );
+
+        assertEquals(true, result.get("is_anomaly"));
+        assertEquals("rule_based", result.get("source"));
+        assertEquals("hour_zscore_fallback", result.get("model_name"));
+        assertEquals("HIGH", result.get("severity"));
+        assertTrue(String.valueOf(result.get("reason")).contains("sigma"));
+
+        verify(anomalyRepository).save(argThat(anomaly ->
+                anomaly.getPredictionId().equals(88L)
+                        && forecastTimestamp.equals(anomaly.getTimestamp())
+                        && "HIGH".equals(anomaly.getSeverity())
+                        && "hour_zscore_fallback".equals(anomaly.getModelName())
         ));
 
         mockServer.verify();

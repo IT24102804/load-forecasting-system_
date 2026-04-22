@@ -48,6 +48,9 @@ class AdminFeedbackRestControllerWebTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].userName").value("Test User"))
+                .andExpect(jsonPath("$[0].userEmail").value("test@example.com"))
+                .andExpect(jsonPath("$[0].message").value("Test message"))
                 .andExpect(jsonPath("$[0].adminReply").value("First reply"))
                 .andExpect(jsonPath("$[0].status").value("ACKNOWLEDGED"))
                 .andExpect(jsonPath("$[1].id").value(2))
@@ -71,6 +74,7 @@ class AdminFeedbackRestControllerWebTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(7))
+                .andExpect(jsonPath("$.message").value("Test message"))
                 .andExpect(jsonPath("$.adminReply").value("Issue reviewed and resolved by admin."))
                 .andExpect(jsonPath("$.status").value("RESOLVED"));
     }
