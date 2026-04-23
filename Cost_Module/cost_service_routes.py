@@ -26,9 +26,6 @@ REQUIRED_MODEL_FEATURES = {
     "coal_price",
     "naphtha_price",
     "diesel_price",
-    "load_demand",
-    "month_sin",
-    "month_cos",
     "thermal_ratio_ld",
     "hydro_ratio_ld",
     "coal_ratio_ld",
@@ -115,10 +112,6 @@ def check_out_of_distribution(payload):
 
 def _normalize_input(feature_names, payload):
     base = dict(payload)
-    if "date" in base and base.get("date") is not None:
-        ts = pd.to_datetime(base.get("date"), errors="coerce")
-    else:
-        ts = None
 
     def f(key, default=0.0):
         val = base.get(key)
@@ -144,13 +137,6 @@ def _normalize_input(feature_names, payload):
     base.setdefault("thermal_x_diesel", total_thermal * diesel_price)
     base.setdefault("thermal_x_naphtha", total_thermal * naphtha_price)
     base.setdefault("coal_x_coalprice", total_coal * coal_price)
-
-    if ts is not None and not pd.isna(ts):
-        base.setdefault("year", int(ts.year))
-        base.setdefault("is_weekend", 1 if ts.dayofweek >= 5 else 0)
-        month = ts.month
-        base.setdefault("month_sin", float(np.sin(2 * np.pi * month / 12)))
-        base.setdefault("month_cos", float(np.cos(2 * np.pi * month / 12)))
 
     row = {}
     for name in feature_names:

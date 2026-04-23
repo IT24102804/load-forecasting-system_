@@ -33,7 +33,8 @@ public class FullChainReportController {
 
     @GetMapping("/api/reports/full-chain/export")
     @ResponseBody
-    public ResponseEntity<?> exportPdf(@RequestParam(name = "costRunId", required = false) Long costRunId) {
+    public ResponseEntity<?> exportPdf(@RequestParam(name = "costRunId", required = false) Long costRunId,
+                                       @RequestParam(name = "preview", required = false, defaultValue = "false") boolean preview) {
         if (costRunId == null || costRunId <= 0) {
             return ResponseEntity.badRequest().body(Map.of("error", "costRunId is required."));
         }
@@ -41,8 +42,9 @@ public class FullChainReportController {
         try {
             byte[] pdf = fullChainReportService.exportFullChainReportPdf(costRunId);
             String filename = "full-chain-report-" + costRunId + ".pdf";
+            String disposition = (preview ? "inline" : "attachment") + "; filename=\"" + filename + "\"";
             ResponseEntity<byte[]> ok = ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, disposition)
                     .contentType(MediaType.parseMediaType("application/pdf"))
                     .body(pdf);
             return ok;

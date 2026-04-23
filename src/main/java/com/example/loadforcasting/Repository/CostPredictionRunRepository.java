@@ -20,6 +20,11 @@ public interface CostPredictionRunRepository extends JpaRepository<CostPredictio
             LocalDateTime to
     );
 
+    Optional<CostPredictionRun> findFirstByForecastTimestampBetweenOrderByCreatedAtDesc(
+            LocalDateTime from,
+            LocalDateTime to
+    );
+
     Optional<CostPredictionRun> findFirstByGenerationMixRun_IdOrderByCreatedAtDesc(
             Long generationMixResultId
     );

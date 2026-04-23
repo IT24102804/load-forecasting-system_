@@ -94,7 +94,7 @@ public class FullChainReportService {
             addRow(loadTable, "Temperature (°C)", fmt(loadRequest.getTemperature()), bodyFont);
             addRow(loadTable, "Humidity (%)", fmt(loadRequest.getHumidity()), bodyFont);
             addRow(loadTable, "Public Event", String.valueOf(loadRequest.getPublicEvent()), bodyFont);
-            addRow(loadTable, "Predicted Load (kW)", fmt(loadRequest.getPredictedLoad()), bodyFont);
+            addRow(loadTable, "Predicted Load (MW)", fmt(loadRequest.getPredictedLoad()), bodyFont);
             document.add(loadTable);
             document.add(new Paragraph(" "));
 
@@ -130,10 +130,10 @@ public class FullChainReportService {
             PdfPTable fuelTable = new PdfPTable(2);
             fuelTable.setWidthPercentage(100);
             addSectionHeader(fuelTable, "FUEL PRICES USED", sectionFont);
-            addRow(fuelTable, "Furnace Oil (LKR)", fmt(costRun.getFoPrice()), bodyFont);
-            addRow(fuelTable, "Coal (LKR)", fmt(costRun.getCoalPrice()), bodyFont);
-            addRow(fuelTable, "Naphtha (LKR)", fmt(costRun.getNaphthaPrice()), bodyFont);
-            addRow(fuelTable, "Diesel (LKR)", fmt(costRun.getDieselPrice()), bodyFont);
+            addRow(fuelTable, "Furnace Oil (LKR / litre)", fmt(costRun.getFoPrice()), bodyFont);
+            addRow(fuelTable, "Coal (LKR / kg)", fmt(costRun.getCoalPrice()), bodyFont);
+            addRow(fuelTable, "Naphtha (LKR / litre)", fmt(costRun.getNaphthaPrice()), bodyFont);
+            addRow(fuelTable, "Diesel (LKR / litre)", fmt(costRun.getDieselPrice()), bodyFont);
             document.add(fuelTable);
             document.add(new Paragraph(" "));
 

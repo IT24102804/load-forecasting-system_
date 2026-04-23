@@ -55,7 +55,7 @@
                         <th>Run ID</th>
                         <th>Prediction ID</th>
                         <th>Timestamp</th>
-                        <th>Reservoir (%)</th>
+                        <th>Reservoir Capacity Level(%)</th>
                         <th>Estimated Demand (MWh)</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -177,7 +177,7 @@
                 </div>
 
                 <div class="mb-4">
-                    <label for="reservoirPct" class="form-label">Reservoir Level (%) <span class="text-danger">*</span></label>
+                    <label for="reservoirPct" class="form-label">Reservoir Capacity Level (%) <span class="text-danger">*</span></label>
                     <input id="reservoirPct" type="number" class="form-control" min="0" max="100" step="0.1" required
                            th:value="${prefillReservoirPct != null ? prefillReservoirPct : 75}" placeholder="e.g. 75">
                     <div id="reservoirPctError" class="invalid-feedback">Reservoir percentage must be between 0 and 100.</div>
@@ -391,11 +391,12 @@
             showMixAlert('error', 'Saved mix id is missing.');
             return;
         }
+
         if (!confirm(`Delete saved mix #${runId}?`)) {
             return;
         }
         try {
-            const response = await fetch(`/api/generation-mix/runs/${runId}`, { method: 'DELETE' });
+            const response = await fetch(`/api/generation-mix/runs/${encodeURIComponent(runId)}`, { method: 'DELETE' });
             const result = await response.json();
             if (!response.ok) {
                 throw new Error(result.error || 'Failed to delete saved mix.');
@@ -655,7 +656,7 @@
                 reservoirInput.classList.add('is-invalid');
                 reservoirInput.focus();
             }
-            showMixAlert('error', reservoirPctError?.textContent || 'Please enter a valid reservoir percentage (0 - 100).');
+            showMixAlert('error', 'Please enter valid numeric values and try again.');
             return;
         }
 
@@ -665,7 +666,7 @@
                 reservoirInput.classList.add('is-invalid');
                 reservoirInput.focus();
             }
-            showMixAlert('error', 'Please enter a valid reservoir percentage (0 - 100).');
+            showMixAlert('error', 'Please enter valid numeric values and try again.');
             return;
         }
 

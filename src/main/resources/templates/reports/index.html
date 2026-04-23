@@ -14,13 +14,38 @@
                 <div class="form-text">Use the saved cost prediction run id.</div>
             </div>
             <div class="col-md-6">
-                <button id="exportBtn" class="btn btn-primary rounded-pill px-4 fw-bold" type="button" onclick="exportReport()">
-                    <i class="fas fa-download me-1"></i>Export Full-Chain PDF
-                </button>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button id="previewBtn" class="btn btn-outline-primary rounded-pill px-4 fw-bold" type="button" onclick="previewReport()">
+                        <i class="fas fa-eye me-1"></i>Preview
+                    </button>
+                    <button id="exportBtn" class="btn btn-primary rounded-pill px-4 fw-bold" type="button" onclick="exportReport()">
+                        <i class="fas fa-download me-1"></i>Export Full-Chain PDF
+                    </button>
+                </div>
             </div>
         </div>
 
         <div id="reportError" class="alert alert-danger border-0 shadow-sm mt-4" style="display:none;"></div>
+    </div>
+
+    <div class="modal fade" id="reportPreviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Full-Chain Report Preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0" style="height:70vh;">
+                    <iframe id="reportPreviewFrame" title="Full-Chain Report Preview" style="width:100%;height:100%;border:0;"></iframe>
+                </div>
+                <div class="modal-footer">
+                    <a id="reportPreviewDownload" class="btn btn-primary rounded-pill px-4 fw-bold" target="_blank" rel="noopener">
+                        <i class="fas fa-download me-1"></i>Download PDF
+                    </a>
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4 fw-bold" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -55,19 +80,46 @@
             window.URL.revokeObjectURL(url);
         }
 
-        async function exportReport() {
-            document.getElementById('reportError').style.display = 'none';
+        function getValidatedCostRunId() {
             const input = document.getElementById('costRunId');
             if (!input || !input.checkValidity()) {
                 input?.focus();
                 showReportError('Please enter a valid Cost Run ID.');
-                return;
+                return null;
             }
 
             const costRunId = Number.parseInt(input.value, 10);
             if (!Number.isFinite(costRunId) || costRunId <= 0) {
                 input.focus();
                 showReportError('Please enter a valid Cost Run ID.');
+                return null;
+            }
+            return costRunId;
+        }
+
+        function previewReport() {
+            document.getElementById('reportError').style.display = 'none';
+            const costRunId = getValidatedCostRunId();
+            if (costRunId == null) {
+                return;
+            }
+
+            const previewUrl = `/api/reports/full-chain/export?costRunId=${encodeURIComponent(String(costRunId))}&preview=true`;
+            const downloadUrl = `/api/reports/full-chain/export?costRunId=${encodeURIComponent(String(costRunId))}`;
+            const frame = document.getElementById('reportPreviewFrame');
+            const downloadLink = document.getElementById('reportPreviewDownload');
+
+            frame.src = previewUrl;
+            downloadLink.href = downloadUrl;
+
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('reportPreviewModal'));
+            modal.show();
+        }
+
+        async function exportReport() {
+            document.getElementById('reportError').style.display = 'none';
+            const costRunId = getValidatedCostRunId();
+            if (costRunId == null) {
                 return;
             }
 

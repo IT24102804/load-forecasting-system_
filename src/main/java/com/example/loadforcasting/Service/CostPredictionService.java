@@ -88,6 +88,7 @@ public class CostPredictionService {
             out.put("cost_run_id", existing.get().getId());
             out.put("runId", existing.get().getId());
             out.put("reused", true);
+            out.put("info", "Already predicted for this mix and fuel prices. Showing the saved result.");
             out.put("source", existing.get().getSource());
             out.put("modelVersion", modelVersion.getVersionLabel());
             out.put("modelName", modelVersion.getModelName());
@@ -95,7 +96,29 @@ public class CostPredictionService {
         }
 
         Map<String, Object> body = executePrediction(run, foKey, coalKey, dieselKey, naphthaKey);
-        CostPredictionRun savedRun = saveRun(run, requestEntity, modelVersion, foKey, coalKey, dieselKey, naphthaKey, body, forceNew);
+        CostPredictionRun savedRun;
+        try {
+            savedRun = saveRun(run, requestEntity, modelVersion, foKey, coalKey, dieselKey, naphthaKey, body, forceNew);
+        } catch (DataIntegrityViolationException e) {
+            var fallback = costPredictionRunRepository
+                    .findFirstByGenerationMixRun_IdAndFoPriceAndCoalPriceAndDieselPriceAndNaphthaPriceOrderByCreatedAtDesc(
+                            run.getId(), foKey, coalKey, dieselKey, naphthaKey
+                    )
+                    .orElse(null);
+            if (fallback != null) {
+                Map<String, Object> out = new LinkedHashMap<>();
+                out.put("unit_cost", fallback.getUnitCost());
+                out.put("cost_run_id", fallback.getId());
+                out.put("runId", fallback.getId());
+                out.put("reused", true);
+                out.put("info", "Already predicted for this mix and fuel prices. Showing the saved result.");
+                out.put("source", fallback.getSource());
+                out.put("modelVersion", modelVersion.getVersionLabel());
+                out.put("modelName", modelVersion.getModelName());
+                return out;
+            }
+            throw e;
+        }
         body.put("cost_run_id", savedRun.getId());
         body.put("runId", savedRun.getId());
         body.put("reused", false);

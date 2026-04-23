@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Recent Cost Entries', 'cost', ~{::content})}">
+<th:block th:fragment="content">
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb breadcrumb-custom">
+            <li class="breadcrumb-item"><a th:href="@{/home}"><i class="fas fa-home me-1"></i>Home</a></li>
+            <li class="breadcrumb-item"><a th:href="@{/cost}"><i class="fas fa-coins me-1"></i>Cost Prediction</a></li>
+            <li class="breadcrumb-item active">Recent Cost Entries</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h2 class="fw-bold mb-1">
+                <i class="fas fa-history me-2" style="color:var(--cobalt);"></i>Recent Cost Entries
+            </h2>
+            <p class="text-muted mb-0">View saved cost predictions and export the report.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a th:href="@{/cost}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold">
+                <i class="fas fa-arrow-left me-1"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <div class="ui-card mb-3">
+        <div class="p-3">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-sm-8 col-md-6 col-lg-5">
+                    <label for="recentDateFilter" class="form-label mb-1">Forecast Date</label>
+                    <div class="input-group">
+                        <input id="recentDateFilter" type="date" class="form-control">
+                        <button id="recentDateClear" type="button" class="btn btn-outline-secondary" title="Clear date">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="form-text">Filter the table by forecast date.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-card">
+        <div class="table-responsive">
+            <table id="recentCostTable" class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                <tr>
+                    <th>Entry</th>
+                    <th>Generation Mix Run</th>
+                    <th>Timestamp</th>
+                    <th>Unit Cost</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:if="${costRuns == null || costRuns.isEmpty()}">
+                    <td colspan="5" class="text-muted text-center py-4">No saved cost entries yet.</td>
+                </tr>
+                <tr th:each="cr : ${costRuns}">
+                    <td class="fw-semibold" th:text="${cr.id}">--</td>
+                    <td th:text="${'Generation Mix Run #' + cr.generationMixResultId}">--</td>
+                    <td class="recent-forecast-ts" th:text="${cr.forecastTimestamp}">--</td>
+                    <td th:text="${#numbers.formatDecimal(cr.unitCost, 1, 2)}">--</td>
+                    <td>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-primary recent-edit-btn"
+                                    th:attr="data-id=${cr.id},data-run-id=${cr.generationMixResultId},data-fo=${cr.foPrice},data-coal=${cr.coalPrice},data-diesel=${cr.dieselPrice},data-naphtha=${cr.naphthaPrice}">
+                                Update
+                            </button>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-info recent-preview-btn"
+                                    th:attr="data-id=${cr.id}">
+                                Report
+                            </button>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger recent-delete-btn"
+                                    th:attr="data-id=${cr.id}">
+                                Delete
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal fade" id="reportPreviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Report Preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="height:75vh;">
+                    <iframe id="reportPreviewFrame" src="about:blank" style="width:100%;height:100%;border:0;"></iframe>
+                </div>
+                <div class="modal-footer">
+                    <a id="reportPreviewDownload" class="btn btn-outline-secondary" href="#" target="_blank" rel="noopener"><i class="fas fa-download me-1"></i>Download</a>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setCostEditPayloadAndGo(button) {
+            const payload = {
+                id: button.getAttribute('data-id'),
+                runId: button.getAttribute('data-run-id'),
+                foPrice: button.getAttribute('data-fo'),
+                coalPrice: button.getAttribute('data-coal'),
+                dieselPrice: button.getAttribute('data-diesel'),
+                naphthaPrice: button.getAttribute('data-naphtha')
+            };
+            try {
+                localStorage.setItem('costEditPayload', JSON.stringify(payload));
+            } catch (e) {
+            }
+            window.location.href = '/cost';
+        }
+
+        async function deleteCostRunFromRecent(id, btn) {
+            if (!id) {
+                return;
+            }
+            const ok = confirm('Delete this saved cost entry?');
+            if (!ok) {
+                return;
+            }
+            try {
+                const response = await fetch(`/api/cost/${encodeURIComponent(id)}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data?.error || 'Failed to delete cost entry.');
+                }
+                const row = btn?.closest('tr');
+                if (row) {
+                    row.remove();
+                }
+            } catch (e) {
+                alert(e?.message || 'Failed to delete cost entry.');
+            }
+        }
+
+        function openReportPreview(costRunId) {
+            if (!costRunId) {
+                return;
+            }
+            const previewUrl = `/api/reports/full-chain/export?costRunId=${encodeURIComponent(costRunId)}&preview=true`;
+            const downloadUrl = `/api/reports/full-chain/export?costRunId=${encodeURIComponent(costRunId)}`;
+
+            const frame = document.getElementById('reportPreviewFrame');
+            if (frame) {
+                frame.src = previewUrl;
+            }
+            const dl = document.getElementById('reportPreviewDownload');
+            if (dl) {
+                dl.href = downloadUrl;
+            }
+
+            const el = document.getElementById('reportPreviewModal');
+            if (!el || !window.bootstrap?.Modal) {
+                window.open(downloadUrl, '_blank', 'noopener');
+                return;
+            }
+            const modal = bootstrap.Modal.getOrCreateInstance(el);
+            modal.show();
+        }
+
+        document.querySelectorAll('.recent-edit-btn').forEach(btn => {
+            btn.addEventListener('click', () => setCostEditPayloadAndGo(btn));
+        });
+
+        document.querySelectorAll('.recent-delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => deleteCostRunFromRecent(btn.getAttribute('data-id'), btn));
+        });
+
+        document.querySelectorAll('.recent-preview-btn').forEach(btn => {
+            btn.addEventListener('click', () => openReportPreview(btn.getAttribute('data-id')));
+        });
+
+        function applyRecentDateFilter(value) {
+            const table = document.getElementById('recentCostTable');
+            if (!table) {
+                return;
+            }
+            const tbody = table.querySelector('tbody');
+            if (!tbody) {
+                return;
+            }
+
+            const selected = (value || '').trim();
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            for (const row of rows) {
+                const tsCell = row.querySelector('.recent-forecast-ts');
+                if (!tsCell) {
+                    continue;
+                }
+
+                const raw = (tsCell.textContent || '').trim();
+                const rowDate = raw.length >= 10 ? raw.substring(0, 10) : raw;
+
+                if (!selected) {
+                    row.style.display = '';
+                    continue;
+                }
+
+                row.style.display = rowDate === selected ? '' : 'none';
+            }
+        }
+
+        const recentDateFilter = document.getElementById('recentDateFilter');
+        if (recentDateFilter) {
+            recentDateFilter.addEventListener('change', () => applyRecentDateFilter(recentDateFilter.value));
+        }
+
+        const recentDateClear = document.getElementById('recentDateClear');
+        if (recentDateClear) {
+            recentDateClear.addEventListener('click', () => {
+                if (recentDateFilter) {
+                    recentDateFilter.value = '';
+                }
+                applyRecentDateFilter('');
+            });
+        }
+    </script>
+
+</th:block>
+</html>

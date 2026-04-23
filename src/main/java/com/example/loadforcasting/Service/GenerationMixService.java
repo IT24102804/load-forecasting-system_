@@ -124,7 +124,14 @@ public class GenerationMixService {
     }
 
     public void deleteRun(Long id) {
-        generationMixRunRepository.deleteById(id);
+        try {
+            generationMixRunRepository.deleteById(id);
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalArgumentException(
+                    "Cannot delete this Generation Mix Run because it is used by saved cost predictions. " +
+                            "Delete the related cost entries first (Recent Cost Entries), then try again."
+            );
+        }
     }
 
     public GenerationMixRun rerunAndUpdate(Long runId, LoadRequest loadRequest, double reservoirPct) {

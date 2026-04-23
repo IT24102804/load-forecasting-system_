@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.sql.DataSource;
 import java.time.LocalDate;
 import java.sql.Connection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -98,15 +99,17 @@ public class GenerationMixController {
 
     @GetMapping("/api/generation-mix/runs")
     @ResponseBody
-    public List<GenerationMixRun> getRuns() {
-        return generationMixService.getAllRuns();
+    public List<Map<String, Object>> getRuns() {
+        return generationMixService.getAllRuns().stream()
+                .map(this::toRunResponse)
+                .toList();
     }
 
     @GetMapping("/api/generation-mix/runs/{id}")
     @ResponseBody
     public ResponseEntity<?> getRun(@PathVariable Long id) {
         return generationMixService.getRunById(id)
-                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .<ResponseEntity<?>>map(run -> ResponseEntity.ok(toRunResponse(run)))
                 .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Saved mix not found")));
     }
 
@@ -143,7 +146,7 @@ public class GenerationMixController {
             }
 
             GenerationMixRun updated = generationMixService.rerunAndUpdate(id, loadRequest, reservoirPct);
-            return ResponseEntity.ok(updated);
+            return ResponseEntity.ok(toRunResponse(updated));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
@@ -217,5 +220,29 @@ public class GenerationMixController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    private Map<String, Object> toRunResponse(GenerationMixRun run) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("id", run.getId());
+        response.put("generation_mix_run_id", run.getId());
+        response.put("loadRequestId", run.getLoadRequestId());
+        response.put("forecastTimestamp",
+                run.getForecastTimestamp() != null ? run.getForecastTimestamp().toString() : null);
+        response.put("estimatedDailyDemandMwh", run.getEstimatedDailyDemandMwh());
+        response.put("reservoirPct", run.getReservoirPct());
+        response.put("source", run.getSource());
+        response.put("runReason", run.getRunReason());
+        response.put("reused", run.getReused());
+        response.put("totalMwh", run.getTotalMwh());
+        response.put("majorHydroMwh", run.getMajorHydroMwh());
+        response.put("totalCoalMwh", run.getTotalCoalMwh());
+        response.put("totalThermalMwh", run.getTotalThermalMwh());
+        response.put("windMwh", run.getWindMwh());
+        response.put("solarMwh", run.getSolarMwh());
+        response.put("miniHydroMwh", run.getMiniHydroMwh());
+        response.put("createdAt", run.getCreatedAt() != null ? run.getCreatedAt().toString() : null);
+        response.put("updatedAt", run.getUpdatedAt() != null ? run.getUpdatedAt().toString() : null);
+        return response;
     }
 }
